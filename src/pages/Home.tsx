@@ -90,6 +90,42 @@ export function Home({ onOpenStudio, onOpenInquiry, onOpenLightbox }: HomeProps)
         </div>
       </section>
 
+      {/* IN THE KITCHEN — beautiful looping first-person video (GOAT emotional touch)
+           First-person POV of a woman kneading dough on a flour-dusted wooden bread board.
+           Soft natural lighting, gentle rhythm, warm and intimate feel.
+           IMPORTANT for production: 
+           - Download a high-quality matching video (search Pexels/Mixkit/Coverr for "hands kneading dough pov" or "baker kneading bread first person").
+           - Optimize for web (target <3-5MB): use ffmpeg for webm (VP9) + mp4 (H.264) fallbacks.
+           - Host in /public/videos/kitchen-kneading.webm (and .mp4) and update sources.
+           - Or self-host on CDN / Vercel for best performance and no hotlink issues.
+           Current src is a temporary placeholder baking-related loop for demo.
+           Attributes: autoPlay muted loop playsInline for reliable mobile/desktop muted loop.
+      */}
+      <section className="kitchen-section">
+        <div className="container">
+          <div className="text-center mb-6">
+            <div className="uppercase tracking-[3px] text-xs text-[#C17F59] mb-1">Behind the Apron</div>
+            <h2 className="text-3xl">In the Kitchen</h2>
+          </div>
+          <div className="kitchen-video-container">
+            <video
+              autoPlay
+              muted
+              loop
+              playsInline
+              className="w-full h-auto"
+              aria-label="First-person POV of hands gently kneading dough on flour-dusted wooden board, soft natural window light, warm intimate atmosphere"
+            >
+              {/* Placeholder - replace with real POV kneading video as described above */}
+              <source src="https://assets.mixkit.co/videos/preview/1005/1005-small.mp4" type="video/mp4" />
+              {/* For production add: <source src="/videos/kitchen-kneading.webm" type="video/webm" /> */}
+              Your browser does not support the video tag.
+            </video>
+          </div>
+          <p className="kitchen-caption">The quiet rhythm of hands, flour, and wood. This is where the magic begins.</p>
+        </div>
+      </section>
+
       {/* SIGNATURE TEASER — scroll reveal for delight */}
       <motion.section 
         className="section container"
