@@ -101,30 +101,49 @@ export function Home({ onOpenStudio, onOpenInquiry, onOpenLightbox }: HomeProps)
            Current src is a temporary placeholder baking-related loop for demo.
            Attributes: autoPlay muted loop playsInline for reliable mobile/desktop muted loop.
       */}
-      <section className="kitchen-section">
+      {/* The video is now the star that fills the large empty visual space */}
+      <motion.section 
+        className="kitchen-section"
+        initial={{ opacity: 0, y: 20 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true, margin: "-50px" }}
+        transition={{ duration: 0.7, ease: [0.23, 1, 0.32, 1] }}
+      >
         <div className="container">
-          <div className="text-center mb-6">
+          <div className="text-center mb-5">
             <div className="uppercase tracking-[3px] text-xs text-[#C17F59] mb-1">Behind the Apron</div>
-            <h2 className="text-3xl">In the Kitchen</h2>
+            <h2 className="text-3xl tracking-tight">In the Kitchen</h2>
           </div>
           <div className="kitchen-video-container">
+            {/* 
+              GOAT POLISH: Filling the large empty square/space with the user's provided short video clip.
+              Video: First-person POV of a woman kneading dough on a flour-dusted wooden bread board.
+              Soft natural lighting, gentle rhythm, warm and intimate feel — perfect emotional centerpiece.
+              
+              File: Copied from /home/bppc/Desktop/grok-video-....mp4 to /public/videos/kitchen.mp4 (2.8MB).
+              Also referenced via the Grok link provided: https://grok.com/imagine/post/0d0d5060-54a4-43a0-993a-c19a5b16bd91
+              
+              Implementation:
+              - Autoplay, muted, loop, playsInline for seamless, silent, reliable playback (mobile + desktop).
+              - Contained in .kitchen-video-container (styled with warm frame + overlay for premium bakery aesthetic).
+              - This directly addresses the "large empty square" by placing a beautiful, relevant looping clip in a prominent dedicated "In the Kitchen" section right after the cinematic hero.
+              - The section was intentionally designed as the perfect home for such personal, intimate footage.
+            */}
             <video
               autoPlay
               muted
               loop
               playsInline
               className="w-full h-auto"
-              aria-label="First-person POV of hands gently kneading dough on flour-dusted wooden board, soft natural window light, warm intimate atmosphere"
+              aria-label="First-person POV of a woman kneading dough on a flour-dusted wooden bread board. Soft natural lighting, gentle rhythm, warm and intimate feel."
             >
-              {/* Placeholder - replace with real POV kneading video as described above */}
-              <source src="https://assets.mixkit.co/videos/preview/1005/1005-small.mp4" type="video/mp4" />
-              {/* For production add: <source src="/videos/kitchen-kneading.webm" type="video/webm" /> */}
+              <source src="/videos/kitchen.mp4" type="video/mp4" />
               Your browser does not support the video tag.
             </video>
           </div>
           <p className="kitchen-caption">The quiet rhythm of hands, flour, and wood. This is where the magic begins.</p>
         </div>
-      </section>
+      </motion.section>
 
       {/* SIGNATURE TEASER — scroll reveal for delight */}
       <motion.section 

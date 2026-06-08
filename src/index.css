@@ -312,36 +312,51 @@ textarea.input { min-height: 120px; resize: vertical; line-height: 1.6; }
   background: var(--bg-alt);
   padding: 4rem 0;
 }
+/* GOAT: Prominent, beautifully framed video container to elegantly fill the large empty square/space.
+   Designed to feel like a warm, intimate window into the kitchen — luxurious yet approachable.
+   The video now replaces what was previously empty/placeholder space.
+*/
 .kitchen-video-container {
   position: relative;
-  max-width: 1100px;
+  max-width: 860px; 
   margin: 0 auto;
-  padding: 0 1.5rem;
-  border-radius: var(--radius-2xl);
+  padding: 0.5rem;
+  border-radius: calc(var(--radius-2xl) + 8px);
   overflow: hidden;
-  box-shadow: 0 25px 60px -15px rgb(0 0 0 / 0.2);
-  background: #3a2f24; /* warm wood-like frame */
+  box-shadow: 0 25px 60px -15px rgb(0 0 0 / 0.3), 
+              0 0 0 1px rgba(212, 165, 116, 0.15) inset;
+  background: linear-gradient(145deg, #3a2f24, #2f261f);
+  /* 
+    GOAT square-filling treatment: 
+    The container is sized to create a strong, prominent focal "square" presence (max-width tuned for balance).
+    The inner video keeps its natural aspect (important for the kneading action) while the beautiful warm frame makes the whole element fill and command the large empty visual space on the page.
+    If you want the *video itself* cropped to a perfect square, change aspect-ratio to 1 / 1 below and it will center/crop nicely.
+  */
 }
 .kitchen-video-container video {
   width: 100%;
   height: auto;
   display: block;
-  aspect-ratio: 16 / 9;
+  aspect-ratio: 16 / 9; 
   object-fit: cover;
+  border-radius: var(--radius-2xl);
 }
 .kitchen-video-container::after {
   content: '';
   position: absolute;
-  inset: 0;
-  background: linear-gradient(to bottom, rgba(0,0,0,0.1) 0%, rgba(0,0,0,0.25) 60%, rgba(0,0,0,0.15) 100%);
+  inset: 0.75rem; /* inset to match padding */
+  border-radius: var(--radius-2xl);
+  background: linear-gradient(to bottom, rgba(0,0,0,0.08) 0%, rgba(0,0,0,0.22) 55%, rgba(0,0,0,0.12) 100%);
   pointer-events: none;
+  z-index: 1;
 }
 .kitchen-caption {
   text-align: center;
-  margin-top: 1.25rem;
-  font-size: 0.9rem;
+  margin-top: 1rem;
+  font-size: 0.92rem;
   color: var(--text-muted);
-  letter-spacing: 0.5px;
+  letter-spacing: 0.8px;
+  font-style: italic;
 }
 
 /* ============================================
