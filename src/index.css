@@ -307,16 +307,16 @@ textarea.input { min-height: 120px; resize: vertical; line-height: 1.6; }
 }
 .hero-visuals .bake-layer img { width: 100%; height: 100%; object-fit: cover; display: block; }
 
-/* In the Kitchen — beautiful looping first-person video section */
+/* In the Kitchen — cinematic hero image (replaced video for reliability) */
 .kitchen-section {
   background: var(--bg-alt);
   padding: 4rem 0;
 }
-/* GOAT: Prominent, beautifully framed video container to elegantly fill the large empty square/space.
-   Designed to feel like a warm, intimate window into the kitchen — luxurious yet approachable.
-   The video now replaces what was previously empty/placeholder space.
+/* GOAT: Prominent, beautifully framed container for the hero image.
+   Warm dark wood-toned frame creates an intimate window into the kitchen.
+   Luxurious yet approachable, perfectly showcases the hands + flour moment.
 */
-.kitchen-video-container {
+.kitchen-frame {
   position: relative;
   max-width: 620px; 
   margin: 0 auto;
@@ -327,23 +327,21 @@ textarea.input { min-height: 120px; resize: vertical; line-height: 1.6; }
               0 0 0 1px rgba(212, 165, 116, 0.15) inset;
   background: linear-gradient(145deg, #3a2f24, #2f261f);
   /* 
-    Portrait video treatment (2:3 source from the kneading clip):
-    - Narrower container (max 620px) + centered narrower video (max 520px) creates a beautiful matted "window" frame.
-    - Full natural aspect preserved (no cropping of hands/action).
+    Centered hero treatment:
+    - Narrower container (max 620px) + centered media (max 520px) creates a beautiful matted "window" frame.
     - The warm dark frame + subtle gradient overlay gives premium intimate bakery feel.
-    - max-height on video keeps section balanced on desktop while remaining prominent.
   */
 }
-.kitchen-video-container video {
+.kitchen-frame img {
   width: 100%;
   max-width: 520px;
   height: auto;
   margin: 0 auto;
   display: block;
   border-radius: var(--radius-2xl);
-  /* Natural 2:3 aspect from source; no forced aspect-ratio to avoid distortion/cropping */
+  object-fit: cover;
 }
-.kitchen-video-container::after {
+.kitchen-frame::after {
   content: '';
   position: absolute;
   inset: 0.75rem; /* inset to match padding */

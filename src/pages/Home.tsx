@@ -90,12 +90,10 @@ export function Home({ onOpenStudio, onOpenInquiry, onOpenLightbox }: HomeProps)
         </div>
       </section>
 
-      {/* IN THE KITCHEN — beautiful looping first-person video 
-           First-person POV of a woman kneading dough on a flour-dusted wooden bread board.
-           Soft natural lighting, gentle rhythm, warm and intimate feel.
-           This section fills the prominent visual space on the page.
+      {/* IN THE KITCHEN — high-quality static cinematic hero
+           Hands kneading dough, warm lighting, flour in the air.
+           Reliable static image (replaces video for instant excellent display on all devices).
       */}
-      {/* The video is now the star that fills the large empty visual space */}
       <motion.section 
         className="kitchen-section"
         initial={{ opacity: 0, y: 20 }}
@@ -108,32 +106,12 @@ export function Home({ onOpenStudio, onOpenInquiry, onOpenLightbox }: HomeProps)
             <div className="uppercase tracking-[3px] text-xs text-[#C17F59] mb-1">Behind the Apron</div>
             <h2 className="text-3xl tracking-tight">In the Kitchen</h2>
           </div>
-          <div className="kitchen-video-container">
-            {/* 
-              PRODUCTION-READY "In the Kitchen" video:
-              - Source: original grok-video-4a0cb244-61b2-4645-9b64-49a9cdcd0611.mp4 (first-person kneading POV, ~6s loop)
-              - Assets (in public/videos/):
-                  kitchen.webm  (optimized VP9, ~969KB, no audio since muted)
-                  kitchen.mp4   (original 2.8MB, full quality fallback)
-                  kitchen-poster.jpg (extracted frame at 2.2s for instant visual + loading state)
-              - <video> attrs: autoplay muted loop playsInline preload="metadata" + poster (all required for reliable mobile/desktop)
-              - webm first (modern browsers), mp4 fallback
-              - CSS handles portrait 2:3 aspect with elegant warm frame + centered matte presentation
-              - Poster provides excellent static fallback if video doesn't autoplay or during load
-            */}
-            <video
-              autoPlay
-              muted
-              loop
-              playsInline
-              preload="metadata"
-              poster="/videos/kitchen-poster.jpg"
+          <div className="kitchen-frame">
+            <img
+              src="/images/kitchen-hero.jpg"
+              alt="First-person view of hands kneading dough on a flour-dusted wooden bread board. Warm natural lighting, flour in the air, intimate artisan kitchen atmosphere."
               className="w-full h-auto"
-              aria-label="First-person POV of a woman kneading dough on a flour-dusted wooden bread board. Soft natural lighting, gentle rhythm, warm and intimate feel."
-            >
-              <source src="/videos/kitchen.webm" type="video/webm" />
-              <source src="/videos/kitchen.mp4" type="video/mp4" />
-            </video>
+            />
           </div>
           <p className="kitchen-caption">The quiet rhythm of hands, flour, and wood. This is where the magic begins.</p>
         </div>
