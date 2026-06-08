@@ -256,28 +256,72 @@ export function debugSupabase() {
 export async function fetchSiteContent(): Promise<Record<string, string>> {
   try {
     const supabase = getSupabase();
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from(SITE_CONTENT_TABLE)
       .select('key, value');
+
+    if (error) {
+      console.error('[fetchSiteContent] Select error (RLS or table missing?):', {
+        message: error.message, code: error.code, details: error.details, hint: error.hint,
+      });
+      throw error;
+    }
     
     const result: Record<string, string> = { ...DEFAULT_STORY };
     (data || []).forEach((row: any) => {
       if (row.key && row.value != null) result[row.key] = row.value;
     });
+    console.log('[fetchSiteContent] Loaded', Object.keys(result).length, 'keys (including defaults)');
     return result;
-  } catch (e) {
-    console.warn('[Supabase] site_content fetch failed, using defaults', e);
+  } catch (e: any) {
+    console.warn('[Supabase] site_content fetch failed, using defaults. Full error:', e?.message || e);
     return { ...DEFAULT_STORY };
   }
 }
 
 /**
  * Upsert a content key (simple & reliable).
+ * 
+ * FIXED: Added detailed error logging + fallback to explicit insert-then-update pattern
+ * for cases where upsert onConflict behaves oddly with RLS or PostgREST.
+ * This makes "My Story" saves much more robust.
  */
 export async function saveSiteContent(key: string, value: string) {
   const supabase = getSupabase();
-  const { error } = await supabase
-    .from(SITE_CONTENT_TABLE)
-    .upsert({ key, value }, { onConflict: 'key' });
-  if (error) throw error;
+  try {
+    // Preferred: upsert (handles insert or update based on PK "key")
+    const { error } = await supabase
+      .from(SITE_CONTENT_TABLE)
+      .upsert({ key, value }, { onConflict: 'key' });
+
+    if (error) {
+      console.error('[saveSiteContent] Upsert failed, trying fallback insert+update:', error);
+      // Fallback: try update first
+      const { data: updateData, error: updateErr } = await supabase
+        .from(SITE_CONTENT_TABLE)
+        .update({ value })
+        .eq('key', key)
+        .select();
+
+      if (updateErr) throw updateErr;
+
+      if (!updateData || updateData.length === 0) {
+        // No row existed — insert
+        const { error: insertErr } = await supabase
+          .from(SITE_CONTENT_TABLE)
+          .insert({ key, value });
+        if (insertErr) throw insertErr;
+      }
+    }
+    console.log('[saveSiteContent] Successfully saved key:', key);
+  } catch (err: any) {
+    console.error('[saveSiteContent] FINAL FAILURE for key', key, {
+      message: err?.message,
+      code: err?.code,
+      details: err?.details,
+      hint: err?.hint,
+      full: err,
+    });
+    throw err;
+  }
 }

@@ -1,9 +1,10 @@
 @import "tailwindcss";
 
 /* ============================================
-   Angel's Baking — GOAT Premium Portfolio (v2)
-   Warm, emotional, artisanal, buttery, 9.5/10 quality
-   Fully mobile-first • buttery smooth • content-editable
+   Angel's Baking — THE GOAT Artisan Portfolio
+   Warm • Emotional • Ultra-Premium • 9.5+/10
+   Buttery creams, golden crusts, terracotta warmth, soft natural light
+   Multi-page • Smooth • Fully content-editable via Studio (Supabase intact)
    ============================================ */
 
 :root {
@@ -80,6 +81,25 @@ body {
   transition: background-color 0.4s ease, color 0.4s ease;
 }
 
+/* Subtle artisanal linen texture (very light, premium feel) */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image: 
+    linear-gradient(rgba(0,0,0,0.012) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,0,0,0.012) 1px, transparent 1px);
+  background-size: 6px 6px;
+  pointer-events: none;
+  z-index: -1;
+  opacity: 0.6;
+}
+html.warm-dark body::before {
+  background-image: 
+    linear-gradient(rgba(255,255,255,0.015) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.015) 1px, transparent 1px);
+}
+
 h1, h2, h3, .serif {
   font-family: var(--font-serif);
   font-weight: 700;
@@ -93,25 +113,103 @@ h3 { font-size: clamp(1.35rem, 3.5vw, 1.85rem); line-height: 1.15; }
 p { line-height: 1.72; }
 .lead { font-size: 1.15rem; line-height: 1.65; color: var(--text-muted); }
 
-/* Premium button system */
+/* GOAT typography & prose for long-form story (emotional, book-like) */
+.story-prose {
+  font-size: 1.08rem;
+  line-height: 1.82;
+  max-width: 72ch;
+}
+.story-prose p {
+  margin-bottom: 1.35em;
+}
+.story-prose p:first-of-type::first-letter {
+  font-size: 3.1em;
+  line-height: 0.8;
+  float: left;
+  margin-right: 0.12em;
+  margin-top: 0.05em;
+  font-family: var(--font-serif);
+  color: var(--accent);
+}
+.story-prose h3 {
+  font-size: 1.45rem;
+  margin-top: 3.1rem;
+  margin-bottom: 0.7rem;
+  position: relative;
+  display: inline-block;
+}
+.story-prose h3::after {
+  content: '';
+  position: absolute;
+  bottom: -4px;
+  left: 0;
+  width: 42%;
+  height: 1.5px;
+  background: linear-gradient(to right, var(--accent), transparent);
+}
+.story-pullquote {
+  margin: 3.25rem 0;
+  padding: 1.6rem 2rem 1.6rem 2.4rem;
+  border-left: 5px solid var(--accent);
+  font-family: var(--font-serif);
+  font-size: 1.38rem;
+  line-height: 1.38;
+  color: var(--text);
+  font-style: italic;
+  position: relative;
+}
+.story-pullquote::before {
+  content: '“';
+  font-size: 5.5rem;
+  position: absolute;
+  left: 0.6rem;
+  top: -0.6rem;
+  opacity: 0.12;
+  font-family: var(--font-serif);
+  line-height: 1;
+}
+
+/* Premium button system — warm, substantial, thumb-friendly */
 .btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem;
   padding: 0.875rem 1.85rem; font-size: 0.9375rem; font-weight: 600; letter-spacing: 0.01em;
   border-radius: 9999px; transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   cursor: pointer; border: none; white-space: nowrap; text-decoration: none;
+  position: relative;
+  overflow: hidden;
 }
+.btn::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(145deg, rgba(255,255,255,0.25), transparent 40%);
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+.btn:hover::after { opacity: 1; }
+
 .btn-primary {
   background: var(--accent); color: white;
-  box-shadow: 0 2px 10px -2px rgb(0 0 0 / 0.2);
+  box-shadow: 0 3px 12px -2px rgb(0 0 0 / 0.25), 0 1px 3px rgb(0 0 0 / 0.1);
 }
-.btn-primary:hover { background: var(--accent-dark); transform: translateY(-1px); box-shadow: 0 8px 20px -4px rgb(0 0 0 / 0.25); }
+.btn-primary:hover { 
+  background: var(--accent-dark); 
+  transform: translateY(-1.5px); 
+  box-shadow: 0 10px 24px -6px rgb(0 0 0 / 0.3); 
+}
 .btn-primary:active { transform: translateY(0); }
 
 .btn-secondary {
   background: var(--surface); color: var(--text);
   border: 1px solid var(--border-strong);
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.04);
 }
-.btn-secondary:hover { background: var(--surface-warm); border-color: var(--accent); color: var(--accent-dark); }
+.btn-secondary:hover { 
+  background: var(--surface-warm); 
+  border-color: var(--accent); 
+  color: var(--accent-dark); 
+  transform: translateY(-1px);
+}
 
 .btn-ghost {
   background: transparent; color: var(--text-muted); padding: 0.5rem 1.1rem; border: 1px solid transparent;
@@ -981,11 +1079,11 @@ h3 { font-size: 1.5rem; line-height: 1.15; }
   }
 }
 
-/* Signature grid */
+/* Signature grid — ultra-premium, drool-worthy cards (GOAT level) */
 .signature-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-  gap: 1.25rem;
+  grid-template-columns: repeat(auto-fit, minmax(310px, 1fr));
+  gap: 1.65rem;
 }
 
 @media (max-width: 640px) {
@@ -994,17 +1092,86 @@ h3 { font-size: 1.5rem; line-height: 1.15; }
   }
 }
 
-.signature-card {
-  background: var(--surface);
-  border-radius: 18px;
+.bake-hero-card {
+  background: var(--surface); 
+  border-radius: var(--radius-2xl); 
   overflow: hidden;
-  border: 1px solid var(--border);
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  border: 1px solid var(--border); 
+  box-shadow: 0 4px 16px -4px rgb(0 0 0 / 0.07), 0 10px 30px -12px rgb(0 0 0 / 0.06);
+  transition: transform 0.28s cubic-bezier(0.23, 1, 0.32, 1), 
+              box-shadow 0.28s cubic-bezier(0.23, 1, 0.32, 1),
+              border-color 0.2s ease;
+  display: flex; 
+  flex-direction: column;
+  position: relative;
+}
+.bake-hero-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(255,255,255,0.06) 0%, transparent 28%);
+  pointer-events: none;
+  z-index: 1;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+.bake-hero-card:hover { 
+  transform: translateY(-8px) scale(1.005); 
+  box-shadow: 0 30px 60px -15px rgb(0 0 0 / 0.16), 0 10px 25px -8px rgb(0 0 0 / 0.1);
+  border-color: var(--accent-light);
+}
+.bake-hero-card:hover::before { opacity: 1; }
+
+.bake-hero-card .media {
+  position: relative; 
+  aspect-ratio: 4 / 3; 
+  background: var(--bg-alt); 
+  overflow: hidden;
+}
+.bake-hero-card .media img {
+  width: 100%; 
+  height: 100%; 
+  object-fit: cover; 
+  transition: transform 720ms cubic-bezier(0.22,1,0.36,1);
+  filter: contrast(1.02) saturate(1.05);
+}
+.bake-hero-card:hover .media img { 
+  transform: scale(1.085); 
 }
 
-.signature-card:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 15px 30px -10px rgb(0 0 0 / 0.1);
+.bake-hero-card .meta {
+  padding: 1.45rem 1.5rem 1.6rem; 
+  flex: 1; 
+  display: flex; 
+  flex-direction: column;
+  position: relative;
+  z-index: 2;
+}
+.bake-hero-card .meta h3 { 
+  font-size: 1.38rem; 
+  margin-bottom: 0.3rem; 
+  line-height: 1.15;
+}
+.bake-hero-card .category { 
+  font-size: 0.72rem; 
+  letter-spacing: 2px; 
+  text-transform: uppercase; 
+  color: var(--accent); 
+  font-weight: 700; 
+  opacity: 0.95;
+}
+.bake-hero-card .desc {
+  margin-top: 0.9rem; 
+  color: var(--text-muted); 
+  font-size: 0.96rem; 
+  line-height: 1.58; 
+  flex: 1;
+}
+.bake-hero-card .actions { 
+  margin-top: 1.25rem; 
+  display: flex; 
+  gap: 0.65rem; 
+  flex-wrap: wrap; 
 }
 
 /* Testimonials */
@@ -1070,5 +1237,203 @@ h3 { font-size: 1.5rem; line-height: 1.15; }
 @supports (height: 100dvh) {
   .hero {
     min-height: 100dvh;
+  }
+}
+
+/* ============================================
+   GOAT VISUAL UPGRADES — Premium details
+   ============================================ */
+
+/* Cinematic hero — even more emotional & layered */
+.hero {
+  min-height: 100dvh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(145deg, var(--bg) 0%, var(--bg-alt) 42%, var(--bg-deep) 100%);
+}
+.hero::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 50% 30%, rgba(255,255,255,0.035) 0%, transparent 55%);
+  pointer-events: none;
+}
+
+/* Refined gallery cards — mouthwatering hovers */
+.bake-card {
+  position: relative; 
+  overflow: hidden; 
+  background: var(--surface);
+  border-radius: 18px; 
+  border: 1px solid var(--border);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.03), 0 8px 22px -8px rgb(0 0 0 / 0.08);
+  transition: transform .22s cubic-bezier(0.23,1,0.32,1), 
+              box-shadow .22s cubic-bezier(0.23,1,0.32,1);
+  cursor: zoom-in;
+}
+.bake-card:hover { 
+  transform: translateY(-4px); 
+  box-shadow: 0 22px 45px -14px rgb(0 0 0 / 0.15); 
+}
+.bake-card img { 
+  display: block; 
+  width: 100%; 
+  height: auto; 
+  transition: transform 620ms cubic-bezier(0.22,1,0.36,1); 
+  filter: contrast(1.01) saturate(1.04);
+}
+.bake-card:hover img { 
+  transform: scale(1.04); 
+}
+.bake-card .overlay {
+  position: absolute; 
+  bottom: 0; 
+  left: 0; 
+  right: 0;
+  padding: 1.4rem 1.15rem 1rem;
+  background: linear-gradient(to top, rgba(31,25,20,0.88) 0%, rgba(31,25,20,0) 70%);
+  color: white; 
+  opacity: 0.97;
+  transition: opacity 0.2s ease;
+}
+.bake-card:hover .overlay { opacity: 1; }
+.bake-card .title { 
+  font-family: var(--font-serif); 
+  font-size: 1.1rem; 
+  font-weight: 700; 
+  letter-spacing: -0.01em; 
+  line-height: 1.15;
+}
+.bake-card .category { 
+  font-size: 0.7rem; 
+  letter-spacing: 1.8px; 
+  text-transform: uppercase; 
+  opacity: .82; 
+  margin-top: 1px;
+}
+
+/* Premium lightbox — gallery star */
+.lightbox {
+  position: fixed; 
+  inset: 0; 
+  z-index: 200; 
+  background: rgba(18,15,12,0.96);
+  display: flex; 
+  align-items: center; 
+  justify-content: center; 
+  padding: 1rem;
+}
+.lightbox-img-wrap {
+  position: relative;
+  background: #111;
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 40px 90px -15px rgb(0 0 0 / 0.6), 
+              0 0 0 1px rgba(255,255,255,0.06) inset;
+}
+.lightbox-meta {
+  margin-top: 1.1rem; 
+  display: flex; 
+  justify-content: space-between; 
+  align-items: flex-end; 
+  gap: 1rem;
+  color: #EDE3D4; 
+  padding: 0 0.4rem;
+}
+.lightbox-meta .title { 
+  font-family: var(--font-serif); 
+  font-size: 1.6rem; 
+  font-weight: 700; 
+  letter-spacing: -0.4px;
+}
+.lightbox-meta .desc {
+  max-width: 620px; 
+  margin-top: 0.35rem; 
+  font-size: 0.98rem; 
+  color: #C9B39E; 
+  line-height: 1.5;
+}
+
+/* Elegant nav active states */
+.nav-links a {
+  position: relative;
+  padding-bottom: 2px;
+}
+.nav-links a.active::after,
+.nav-links a:hover::after {
+  content: '';
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  width: 100%;
+  height: 1.5px;
+  background: var(--accent);
+  border-radius: 2px;
+}
+.nav-links a.active { color: var(--accent); font-weight: 600; }
+
+/* Scroll reveal helpers (used with framer in pages) */
+.reveal {
+  opacity: 0;
+  transform: translateY(18px);
+  transition: all 620ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+.reveal.in-view {
+  opacity: 1;
+  transform: none;
+}
+
+/* Studio polish — even more inviting for Angel */
+.dropzone {
+  border: 2.5px dashed var(--border-strong); 
+  border-radius: 22px; 
+  padding: 2.9rem 1.6rem;
+  text-align: center; 
+  background: var(--surface-warm); 
+  cursor: pointer; 
+  transition: all .25s cubic-bezier(0.23,1,0.32,1);
+}
+.dropzone:hover {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--surface-warm) 70%, var(--accent) 4%);
+}
+.studio-tab {
+  padding: 0.5rem 1.25rem;
+  border-radius: 999px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  white-space: nowrap;
+  cursor: pointer;
+  transition: all .1s ease;
+}
+.studio-tab.active {
+  background: var(--accent);
+  color: white;
+  box-shadow: 0 2px 6px -1px rgb(193 127 89 / 0.3);
+}
+
+/* Beautiful small flourishes / dividers */
+.chapter-rule {
+  height: 1px;
+  background: linear-gradient(to right, transparent, var(--border-strong), transparent);
+  margin: 2.25rem 0;
+}
+.chapter-rule.gold {
+  background: linear-gradient(to right, transparent, var(--gold), transparent);
+}
+
+/* Reduced motion respect */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
+  .bake-hero-card:hover .media img,
+  .bake-card:hover img {
+    transform: none !important;
   }
 }

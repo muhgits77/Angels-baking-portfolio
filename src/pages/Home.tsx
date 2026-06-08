@@ -6,16 +6,24 @@ import { useTestimonials } from '../hooks/useTestimonials';
 import { BakeCard } from '../components/BakeCard';
 import type { Bake } from '../lib/supabase';
 
+/**
+ * GOAT Home: Cinematic, personal, emotional entry point.
+ * Uses Angel's real featured bakes in the hero when available.
+ * Subtle motion + scroll reveals for premium feel.
+ */
+
 interface HomeProps {
   onOpenStudio: () => void;
   onOpenInquiry: (bakeTitle?: string) => void;
   onOpenLightbox: (bake: Bake) => void;
 }
 
-const HERO_BACKGROUNDS = [
-  'https://images.unsplash.com/photo-1509440159596-0249088772ff?w=1600&q=80', // beautiful artisan loaves
-  'https://images.unsplash.com/photo-1555507036-ab1f40388a8b?w=1600&q=80', // croissants / pastries
-  'https://images.unsplash.com/photo-1578985545062-69928b1d9587?w=1600&q=80', // gorgeous cake
+// GOAT upgrade: Prefer Angel's own beautiful bakes for the cinematic hero layers
+// when she has featured items. This makes the site deeply personal and mouth-watering.
+const CURATED_HERO = [
+  'https://images.unsplash.com/photo-1509440159596-0249088772ff?w=1600&q=80',
+  'https://images.unsplash.com/photo-1555507036-ab1f40388a8b?w=1600&q=80',
+  'https://images.unsplash.com/photo-1578985545062-69928b1d9587?w=1600&q=80',
 ];
 
 export function Home({ onOpenStudio, onOpenInquiry, onOpenLightbox }: HomeProps) {
@@ -26,14 +34,20 @@ export function Home({ onOpenStudio, onOpenInquiry, onOpenLightbox }: HomeProps)
   const signature = bakes.filter(b => b.featured).slice(0, 6);
   const recent = [...bakes].sort((a, b) => b.created_at.localeCompare(a.created_at)).slice(0, 8);
 
+  // Use real featured bakes for hero when possible — much more authentic & premium
+  const heroImages = signature.length >= 3 
+    ? signature.slice(0, 3).map(b => b.image_url) 
+    : CURATED_HERO;
+
   const tagline = content.hero_tagline || "Handcrafted with love, baked with joy";
 
   return (
     <div>
       {/* CINEMATIC HERO */}
       <section className="hero">
+        {/* GOAT cinematic hero: real bakes when possible + subtle parallax motion */}
         <div className="hero-visuals">
-          {HERO_BACKGROUNDS.map((url, i) => (
+          {heroImages.map((url, i) => (
             <motion.div
               key={i}
               className="bake-layer"
@@ -76,8 +90,14 @@ export function Home({ onOpenStudio, onOpenInquiry, onOpenLightbox }: HomeProps)
         </div>
       </section>
 
-      {/* SIGNATURE TEASER */}
-      <section className="section container">
+      {/* SIGNATURE TEASER — scroll reveal for delight */}
+      <motion.section 
+        className="section container"
+        initial={{ opacity: 0, y: 24 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true, margin: "-80px" }}
+        transition={{ duration: 0.6, ease: [0.23, 1, 0.32, 1] }}
+      >
         <div className="flex items-end justify-between mb-7">
           <div>
             <div className="uppercase tracking-[3.2px] text-xs text-[#C17F59]">Favorites</div>
@@ -107,10 +127,16 @@ export function Home({ onOpenStudio, onOpenInquiry, onOpenLightbox }: HomeProps)
         <div className="text-center mt-7">
           <Link to="/signature" className="btn btn-ghost">View the full Signature collection →</Link>
         </div>
-      </section>
+      </motion.section>
 
-      {/* GALLERY TEASER + TESTIMONIALS */}
-      <section className="section bg-[#F1E9DC]">
+      {/* GALLERY TEASER + TESTIMONIALS — warm & human */}
+      <motion.section 
+        className="section bg-[#F1E9DC]"
+        initial={{ opacity: 0, y: 20 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true, margin: "-60px" }}
+        transition={{ duration: 0.55, ease: [0.23, 1, 0.32, 1], delay: 0.05 }}
+      >
         <div className="container">
           <div className="flex items-end justify-between mb-7">
             <div>
@@ -151,7 +177,7 @@ export function Home({ onOpenStudio, onOpenInquiry, onOpenLightbox }: HomeProps)
             </div>
           </div>
         </div>
-      </section>
+      </motion.section>
 
       {/* FINAL CTA */}
       <section className="section container text-center">

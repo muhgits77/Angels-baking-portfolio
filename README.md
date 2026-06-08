@@ -26,11 +26,105 @@ Everything beautiful, nothing fragile. Angel can run the entire site from her ph
 
 ---
 
+## IMPORTANT: Fix for Broken Uploads + My Story Saves (Run This Now)
+
+The most common reason for the exact error you are seeing ("Upload failed. Check your Supabase bucket policies + env vars.") + intermittent My Story saves is **missing or incomplete RLS policies** on the `bakes` table, the `bakes` storage bucket, and/or the `site_content` table.
+
+**Copy and paste the entire block below into the Supabase SQL Editor (one time) and run it.**
+
+**If you are seeing the error "Could not find the 'description' column of 'bakes' in the schema cache",** the quickest single command is:
+
+```sql
+ALTER TABLE public.bakes ADD COLUMN IF NOT EXISTS description text;
+```
+
+Then reload the Studio. The full block below includes this plus all other needed policies and tables.
+
+This script:
+- Recreates the permissive policies the original working version relied on (anyone can read/insert/update/delete via the anon key — security is the client-side Studio password only).
+- Adds the same for the three new tables (site_content, testimonials, inquiries).
+- Uses the patterns that are proven to work with `VITE_SUPABASE_ANON_KEY` + no user auth.
+
+```sql
+-- =============================================
+-- COMPLETE RLS FIX FOR ANGEL'S BAKING (RUN THIS)
+-- =============================================
+
+-- 1. Bakes table (the photos + metadata)
+alter table public.bakes enable row level security;
+
+drop policy if exists "Public read" on public.bakes;
+drop policy if exists "Public insert" on public.bakes;
+drop policy if exists "Public update" on public.bakes;
+drop policy if exists "Public delete" on public.bakes;
+
+create policy "Public read" on public.bakes for select using (true);
+create policy "Public insert" on public.bakes for insert with check (true);
+create policy "Public update" on public.bakes for update using (true) with check (true);
+create policy "Public delete" on public.bakes for delete using (true);
+
+-- 2. Storage bucket policies (this is what usually breaks image uploads)
+-- Make sure the bucket named exactly "bakes" exists and is set to PUBLIC in the dashboard first.
+drop policy if exists "Public read" on storage.objects;
+drop policy if exists "Public insert" on storage.objects;
+drop policy if exists "Public update" on storage.objects;
+drop policy if exists "Public delete" on storage.objects;
+
+create policy "Public read" on storage.objects for select using (bucket_id = 'bakes');
+create policy "Public insert" on storage.objects for insert with check (bucket_id = 'bakes');
+create policy "Public update" on storage.objects for update using (bucket_id = 'bakes');
+create policy "Public delete" on storage.objects for delete using (bucket_id = 'bakes');
+
+-- 3. site_content (My Story text editing)
+alter table public.site_content enable row level security;
+
+drop policy if exists "Public read content" on public.site_content;
+drop policy if exists "Public insert content" on public.site_content;
+drop policy if exists "Public update content" on public.site_content;
+
+create policy "Public read content" on public.site_content for select using (true);
+create policy "Public insert content" on public.site_content for insert with check (true);
+create policy "Public update content" on public.site_content for update using (true) with check (true);
+
+-- 4. testimonials
+alter table public.testimonials enable row level security;
+
+drop policy if exists "Public read testimonials" on public.testimonials;
+drop policy if exists "Public insert testimonials" on public.testimonials;
+drop policy if exists "Public update testimonials" on public.testimonials;
+drop policy if exists "Public delete testimonials" on public.testimonials;
+
+create policy "Public read testimonials" on public.testimonials for select using (true);
+create policy "Public insert testimonials" on public.testimonials for insert with check (true);
+create policy "Public update testimonials" on public.testimonials for update using (true) with check (true);
+create policy "Public delete testimonials" on public.testimonials for delete using (true);
+
+-- 5. inquiries (contact form submissions)
+alter table public.inquiries enable row level security;
+
+drop policy if exists "Public insert inquiries" on public.inquiries;
+drop policy if exists "Public update inquiries" on public.inquiries;
+
+create policy "Public insert inquiries" on public.inquiries for insert with check (true);
+create policy "Public update inquiries" on public.inquiries for update using (true) with check (true);
+
+-- Optional: also allow read on inquiries from the Studio if you want the list to work without extra work
+-- (the hook does select, so this helps)
+drop policy if exists "Public read inquiries" on public.inquiries;
+create policy "Public read inquiries" on public.inquiries for select using (true);
+```
+
+After running the SQL, hard-refresh the Studio (or the whole site) and try uploading a photo again. Then try saving a My Story section.
+
+If it still fails, open DevTools Console while doing the action — the new detailed logs in Studio will tell you the exact Supabase error code + message.
+
+---
+
 ## One-Time Supabase Setup (Additive — Your Existing Data Is Safe)
 
-Your current `bakes` table + `bakes` storage bucket + RLS policies **stay exactly the same**.
+(You can skip the block below if you already ran the "COMPLETE RLS FIX" above.)
 
-Run the following in Supabase SQL Editor once:
+Your current `bakes` table + `bakes` storage bucket + RLS policies **stay exactly the same** once the script above has been executed.
 
 ```sql
 -- 1. Optional but recommended: add descriptions to existing bakes

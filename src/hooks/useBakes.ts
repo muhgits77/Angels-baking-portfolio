@@ -106,8 +106,14 @@ export function useBakes(): UseBakesResult {
           supabase.removeChannel(channelRef.current);
         }
 
+        // FIXED: Use a unique channel name on every setup attempt.
+        // Re-using the exact same channel name ('bakes-realtime-v2') across effect re-runs,
+        // StrictMode double-invocations, or hot reloads can cause Supabase to throw:
+        // "cannot add `postgres_changes` callbacks ... after `subscribe()`"
+        // A unique name per attempt + proper removeChannel in cleanup avoids the race.
+        const channelName = `bakes-realtime-${Date.now()}-${Math.random().toString(36).slice(2)}`;
         const channel = supabase
-          .channel('bakes-realtime-v2')
+          .channel(channelName)
           .on(
             'postgres_changes',
             { event: '*', schema: 'public', table: BAKES_TABLE },

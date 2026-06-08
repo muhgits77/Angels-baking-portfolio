@@ -1,9 +1,15 @@
 import { useState, useMemo } from 'react';
+import { motion } from 'framer-motion';
 import { useBakes } from '../hooks/useBakes';
 import { BakeCard } from '../components/BakeCard';
 import type { Bake } from '../lib/supabase';
 import { CATEGORIES, CATEGORY_LABELS } from '../lib/supabase';
 import { Camera } from 'lucide-react';
+
+/**
+ * GOAT Gallery: Premium masonry experience.
+ * Real photos look absolutely drool-worthy with refined overlays and smooth interactions.
+ */
 
 interface GalleryProps {
   onOpenLightbox: (b: Bake) => void;
@@ -64,13 +70,22 @@ export function Gallery({ onOpenLightbox, onOpenStudio }: GalleryProps) {
             {Array.from({ length: 8 }).map((_, i) => <div key={i} className="masonry-item"><div className="bake-card"><div className="aspect-[4/3] skeleton" /></div></div>)}
           </div>
         ) : filtered.length > 0 ? (
-          <div className="masonry pt-1">
+          <motion.div 
+            className="masonry pt-1"
+            initial="hidden"
+            animate="visible"
+            variants={{ visible: { transition: { staggerChildren: 0.018 } } }}
+          >
             {filtered.map(bake => (
-              <div key={bake.id} className="masonry-item">
+              <motion.div 
+                key={bake.id} 
+                className="masonry-item"
+                variants={{ hidden: { opacity: 0, y: 14 }, visible: { opacity: 1, y: 0 } }}
+              >
                 <BakeCard bake={bake} onClick={() => onOpenLightbox(bake)} />
-              </div>
+              </motion.div>
             ))}
-          </div>
+          </motion.div>
         ) : (
           <div className="text-center py-16 border border-[#E5D9C7] rounded-3xl bg-white mt-1">
             <Camera className="mx-auto text-[#C17F59] mb-4" size={38} />

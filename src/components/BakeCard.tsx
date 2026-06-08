@@ -9,6 +9,10 @@ interface BakeCardProps {
   onRequest?: () => void;
 }
 
+/**
+ * BakeCard — reusable, beautiful card used across Signature + Gallery.
+ * GOAT touches: refined image treatment, elegant overlays, prominent "Request" action.
+ */
 export function BakeCard({ bake, variant = 'gallery', onClick, onRequest }: BakeCardProps) {
   const label = CATEGORY_LABELS[bake.category as keyof typeof CATEGORY_LABELS] || bake.category;
 

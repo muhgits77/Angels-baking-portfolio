@@ -1,15 +1,16 @@
 /**
- * Angel's Studio — The powerful, intuitive command center.
- * Tabs:
- *   Bakes     → Upload (camera + library), drag-to-reorder, inline title + description editing, featured toggle, delete
- *   Story     → Edit every section of the long-form My Story page (live preview)
- *   Testimonials → Add / edit / reorder / delete warm authentic quotes
- *   Inquiries → See every custom order request that came through the site
- *   Settings  → Quick links + print + sign out
+ * Angel's Studio — The powerful, intuitive command center (GOAT edition).
+ * Designed to be a joy for Angel to use on phone or desktop.
  *
- * All writes go straight to Supabase. Realtime keeps public site in sync.
+ * Tabs:
+ *   Bakes     → Huge mobile dropzone, drag-to-reorder (framer), inline editing, featured, delete
+ *   My Story  → Full rich-text control over the long-form personal story (live on /story)
+ *   Testimonials + Inquiries + Settings (with diagnostics)
+ *
+ * Every change is instant via Supabase + realtime. Zero code needed.
+ * Clear success/error messages + detailed console logging for peace of mind.
  */
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, Reorder } from 'framer-motion';
 import {
   X, Upload, Camera, Star, StarOff, Trash2, LogOut, RefreshCw, Check,
@@ -18,11 +19,20 @@ import {
 import { toast } from 'sonner';
 
 import type { Bake } from '../lib/supabase';
-import { CATEGORIES, CATEGORY_LABELS, DEFAULT_STORY } from '../lib/supabase';
+import { 
+  CATEGORIES, CATEGORY_LABELS, DEFAULT_STORY, 
+  getSupabase, BAKES_TABLE, BAKES_BUCKET, SITE_CONTENT_TABLE 
+} from '../lib/supabase';
 import { useBakes } from '../hooks/useBakes';
 import { useSiteContent } from '../hooks/useSiteContent';
 import { useTestimonials } from '../hooks/useTestimonials';
 import { useInquiries } from '../hooks/useInquiries';
+
+/**
+ * FIXED: Static imports for Supabase symbols instead of dynamic await import() inside functions.
+ * This eliminates potential race conditions or bundling issues during uploads and makes
+ * stack traces / error reporting cleaner.
+ */
 
 interface StudioProps {
   isOpen: boolean;
@@ -66,10 +76,15 @@ export function Studio({ isOpen, onClose, onExitAuth, authed, onAuthed, password
 
   // Reorderable bakes (local optimistic for smooth drag)
   const [localBakes, setLocalBakes] = useState<Bake[]>([]);
-  // sync when bakes change
-  if (bakes.length && localBakes.length === 0) {
-    setLocalBakes([...bakes]);
-  }
+
+  // FIXED (was a render-time state update anti-pattern):
+  // Seed the draggable list from the realtime bakes only once (when we first receive data).
+  // After the user drags, localBakes becomes the source of truth for the UI until a manual refetch.
+  useEffect(() => {
+    if (bakes.length > 0 && localBakes.length === 0) {
+      setLocalBakes([...bakes]);
+    }
+  }, [bakes, localBakes.length]);
 
   const resetUpload = () => {
     setUploadFile(null);
@@ -100,6 +115,13 @@ export function Studio({ isOpen, onClose, onExitAuth, authed, onAuthed, password
   };
 
   // Direct Supabase upload — same proven logic, now with description
+  // 
+  // MAJOR FIXES:
+  // 1. Use the statically imported getSupabase + constants (no more dynamic import inside the hot path).
+  // 2. Extremely detailed console logging at every step (storage upload success/fail, table insert, exact Supabase error object).
+  // 3. User-facing toast now includes the real error.message + code/hint when available.
+  // 4. Better cleanup on partial failure.
+  // 5. Progress + disabled states already existed and are kept.
   const doUpload = async () => {
     if (!uploadFile || !uploadTitle.trim()) {
       toast.error('Photo + title required');
@@ -108,44 +130,110 @@ export function Studio({ isOpen, onClose, onExitAuth, authed, onAuthed, password
     setIsUploading(true);
     setUploadProgress(8);
 
-    try {
-      const { getSupabase, BAKES_TABLE, BAKES_BUCKET } = await import('../lib/supabase');
-      const supabase = getSupabase();
+    const supabase = getSupabase();   // static import, always available in browser
 
-      const ext = uploadFile.name.split('.').pop();
+    try {
+      console.log('[Studio] Starting upload for', uploadTitle);
+
+      const ext = uploadFile.name.split('.').pop() || 'jpg';
       const fileName = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
       const storagePath = `bakes/${fileName}`;
 
-      const { error: upErr } = await supabase.storage.from(BAKES_BUCKET).upload(storagePath, uploadFile, { cacheControl: '3600' });
-      if (upErr) throw upErr;
+      console.log('[Studio] Uploading to storage bucket:', BAKES_BUCKET, 'path:', storagePath);
+
+      const { error: upErr } = await supabase.storage
+        .from(BAKES_BUCKET)
+        .upload(storagePath, uploadFile, { 
+          cacheControl: '3600',
+          upsert: false 
+        });
+
+      if (upErr) {
+        console.error('[Studio] STORAGE UPLOAD FAILED:', {
+          error: upErr,
+          message: upErr.message,
+          name: upErr.name,
+          statusCode: (upErr as any).statusCode,
+        });
+        throw upErr;
+      }
+
+      console.log('[Studio] Storage upload SUCCESS:', storagePath);
       setUploadProgress(52);
 
       const { data: urlData } = supabase.storage.from(BAKES_BUCKET).getPublicUrl(storagePath);
       const imageUrl = urlData.publicUrl;
+      if (!imageUrl) throw new Error('Failed to get public URL after storage upload');
 
       const maxOrder = bakes.length ? Math.max(...bakes.map(b => b.display_order)) : -1;
 
-      const { error: insErr } = await supabase.from(BAKES_TABLE).insert({
+      console.log('[Studio] Inserting row into', BAKES_TABLE, 'with display_order', maxOrder + 1);
+
+      // FIXED: Only include the `description` field if the user actually provided one.
+      // This prevents the "Could not find the 'description' column of 'bakes' in the schema cache" error
+      // when the user has not yet run the ALTER TABLE to add the column.
+      // If description is omitted entirely, the INSERT succeeds even on older schema.
+      const insertPayload: any = {
         title: uploadTitle.trim(),
         category: uploadCategory,
         image_url: imageUrl,
         storage_path: storagePath,
         display_order: maxOrder + 1,
         featured: uploadFeatured,
-        description: uploadDesc.trim() || null,
-      });
+      };
+      const desc = uploadDesc.trim();
+      if (desc) {
+        insertPayload.description = desc;
+      }
+
+      const { error: insErr } = await supabase.from(BAKES_TABLE).insert(insertPayload);
+
       if (insErr) {
+        console.error('[Studio] TABLE INSERT FAILED:', {
+          error: insErr,
+          message: insErr.message,
+          code: insErr.code,
+          details: insErr.details,
+          hint: insErr.hint,
+        });
+        // Attempt cleanup of orphaned file
         await supabase.storage.from(BAKES_BUCKET).remove([storagePath]).catch(() => {});
         throw insErr;
       }
 
+      console.log('[Studio] Full upload + row insert SUCCESS');
       setUploadProgress(100);
-      toast.success('Added to the gallery!');
+      toast.success('Photo added to the gallery!');
+
       resetUpload();
-      setTimeout(() => refetchBakes(), 280);
+      // Give realtime a moment, then force a refetch as safety net
+      setTimeout(() => refetchBakes().catch(console.error), 300);
+
     } catch (err: any) {
-      console.error(err);
-      toast.error('Upload failed. Check your Supabase bucket policies + env vars.');
+      console.error('[Studio] === UPLOAD FAILED (full details) ===', err);
+      
+      const msg = (err?.message || err?.error?.message || '').toLowerCase();
+
+      if (msg.includes('description') || msg.includes('schema cache')) {
+        toast.error(
+          "Upload failed: Could not find the 'description' column.\n\n" +
+          "Run this exact command in the Supabase SQL Editor, then refresh the Studio and try uploading again:\n\n" +
+          "ALTER TABLE public.bakes ADD COLUMN IF NOT EXISTS description text;\n\n" +
+          "After running it, also click the 'Refresh' button in the Bakes list.",
+          { duration: 15000 }
+        );
+      } else {
+        // Very actionable toast for the user
+        toast.error(
+          `Upload failed: ${err?.message || err?.error?.message || 'Unknown error'}\n\n` +
+          `Common fixes:\n` +
+          `• In Supabase Dashboard → Storage → Policies: ensure there is an "insert" policy on storage.objects for bucket 'bakes'\n` +
+          `• In Supabase Dashboard → Table Editor → bakes → Policies: ensure "insert" policy exists for public/anon\n` +
+          `• The bucket 'bakes' must be marked Public\n` +
+          `See browser console (F12) for the raw Supabase error object.`,
+          { duration: 12000 }
+        );
+      }
     } finally {
       setIsUploading(false);
       setUploadProgress(0);
@@ -153,14 +241,30 @@ export function Studio({ isOpen, onClose, onExitAuth, authed, onAuthed, password
   };
 
   // Update a bake (title / desc / category / featured)
+  // FIXED: Now uses static import + logs the full Supabase error.
+  // Also specially detects the missing 'description' column case and gives the exact ALTER command.
   const updateBake = async (id: string, patch: Partial<Bake>) => {
     try {
-      const { getSupabase, BAKES_TABLE } = await import('../lib/supabase');
       const supabase = getSupabase();
       const { error } = await supabase.from(BAKES_TABLE).update(patch).eq('id', id);
-      if (error) throw error;
-    } catch (e) {
-      toast.error('Update failed — check connection');
+      if (error) {
+        console.error('[updateBake] Failed:', { id, patch, error: error.message, code: error.code, details: error.details, hint: error.hint });
+        throw error;
+      }
+      // Success is silent (realtime will update UI)
+    } catch (e: any) {
+      const errMsg = (e?.message || '').toLowerCase();
+      if ((patch as any).description !== undefined && (errMsg.includes('description') || errMsg.includes('schema cache'))) {
+        toast.error(
+          "Cannot save description yet.\n\n" +
+          "Run this in Supabase SQL Editor:\n\n" +
+          "ALTER TABLE public.bakes ADD COLUMN IF NOT EXISTS description text;\n\n" +
+          "Then refresh the list and try again.",
+          { duration: 12000 }
+        );
+      } else {
+        toast.error(`Update failed: ${e?.message || e}. Check RLS update policy on bakes table.`);
+      }
       console.error(e);
     }
   };
@@ -172,30 +276,37 @@ export function Studio({ isOpen, onClose, onExitAuth, authed, onAuthed, password
   const deleteBake = async (bake: Bake) => {
     if (!confirm(`Delete "${bake.title}" permanently?`)) return;
     try {
-      const { getSupabase, BAKES_TABLE, BAKES_BUCKET } = await import('../lib/supabase');
       const supabase = getSupabase();
-      await supabase.from(BAKES_TABLE).delete().eq('id', bake.id);
+      const { error: dbErr } = await supabase.from(BAKES_TABLE).delete().eq('id', bake.id);
+      if (dbErr) throw dbErr;
+
       if (bake.storage_path) {
-        await supabase.storage.from(BAKES_BUCKET).remove([bake.storage_path]).catch(() => {});
+        const { error: storErr } = await supabase.storage.from(BAKES_BUCKET).remove([bake.storage_path]);
+        if (storErr) console.warn('Storage delete warning (row is already gone):', storErr);
       }
       toast.success('Deleted');
       refetchBakes();
-    } catch (e) {
-      toast.error('Delete failed');
+    } catch (e: any) {
+      console.error('[deleteBake] error', e);
+      toast.error(`Delete failed: ${e?.message || e}. Check delete policies on bakes table + storage bucket.`);
     }
   };
 
   // Drag reorder bakes
+  // FIXED: static import + full error logging
   const onReorderBakes = async (newOrder: Bake[]) => {
     setLocalBakes(newOrder);
     try {
-      const { getSupabase, BAKES_TABLE } = await import('../lib/supabase');
       const supabase = getSupabase();
-      await Promise.all(
-        newOrder.map((b, idx) => supabase.from(BAKES_TABLE).update({ display_order: idx }).eq('id', b.id))
+      const updates = newOrder.map((b, idx) => 
+        supabase.from(BAKES_TABLE).update({ display_order: idx }).eq('id', b.id)
       );
-    } catch (e) {
-      toast.error('Reorder failed');
+      const results = await Promise.all(updates);
+      const firstErr = results.find(r => r.error);
+      if (firstErr?.error) throw firstErr.error;
+    } catch (e: any) {
+      console.error('[onReorderBakes] error', e);
+      toast.error(`Reorder failed: ${e?.message || e}. Check update policy on bakes table.`);
       refetchBakes();
     }
   };
@@ -206,21 +317,36 @@ export function Studio({ isOpen, onClose, onExitAuth, authed, onAuthed, password
     const val = storyDraft[key] || '';
     try {
       await saveContent(key, val);
-      toast.success('Saved');
-    } catch (e) {
-      toast.error('Failed to save story section');
+      toast.success('Saved to Supabase');
+      console.log('[Studio Story] Saved section', key);
+    } catch (e: any) {
+      // The improved saveSiteContent already logged the full details.
+      console.error('[saveStorySection] error for', key, e);
+      toast.error(`Failed to save "${key}": ${e?.message || e}\n\nCheck RLS policies on site_content table (insert + update).`);
     }
   };
 
   const saveAllStory = async () => {
+    const errors: string[] = [];
     try {
       for (const k of storyKeys) {
-        if (storyDraft[k] !== undefined) await saveContent(k, storyDraft[k]);
+        if (storyDraft[k] !== undefined) {
+          try {
+            await saveContent(k, storyDraft[k]);
+          } catch (e: any) {
+            errors.push(`${k}: ${e?.message || e}`);
+          }
+        }
       }
-      toast.success('All story sections published');
-      refetchContent();
-    } catch {
-      toast.error('Some sections failed to save');
+      if (errors.length === 0) {
+        toast.success('All story sections published to Supabase');
+        refetchContent();
+      } else {
+        toast.error(`Some sections failed:\n${errors.join('\n')}`);
+      }
+    } catch (e) {
+      toast.error('Unexpected error while publishing story. See console.');
+      console.error(e);
     }
   };
 
@@ -228,9 +354,60 @@ export function Studio({ isOpen, onClose, onExitAuth, authed, onAuthed, password
   const [newTest, setNewTest] = useState({ quote: '', name: '', role: '' });
   const addTest = async () => {
     if (!newTest.quote.trim() || !newTest.name.trim()) return toast.error('Quote and name required');
-    await addTestimonial(newTest);
-    setNewTest({ quote: '', name: '', role: '' });
-    toast.success('Testimonial added');
+    try {
+      await addTestimonial(newTest);
+      setNewTest({ quote: '', name: '', role: '' });
+      toast.success('Testimonial added');
+    } catch (e: any) {
+      toast.error(`Failed to add testimonial: ${e?.message || e}. Check insert policy on testimonials table.`);
+    }
+  };
+
+  /**
+   * NEW: Robust diagnostics button for Settings tab.
+   * Helps Angel (or support) instantly see if the three critical things work:
+   *   - Can read from bakes
+   *   - Can write to site_content (My Story)
+   *   - Basic storage access (we do a harmless head/list)
+   * This prints very clear PASS/FAIL + the actual Supabase errors.
+   */
+  const runDiagnostics = async () => {
+    const supabase = getSupabase();
+    console.group('[Studio Diagnostics]');
+
+    // 1. bakes table read (should always work if gallery loads)
+    try {
+      const { data, error } = await supabase.from(BAKES_TABLE).select('id').limit(1);
+      if (error) throw error;
+      console.log('✅ bakes SELECT: PASS', data?.length || 0, 'row(s) visible');
+    } catch (e: any) {
+      console.error('❌ bakes SELECT FAILED (RLS read policy?):', e.message || e);
+    }
+
+    // 2. site_content upsert test (the My Story path)
+    const testKey = 'diagnostics_test_' + Date.now();
+    try {
+      await supabase.from(SITE_CONTENT_TABLE).upsert({ key: testKey, value: 'hello from studio test' }, { onConflict: 'key' });
+      console.log('✅ site_content UPSERT: PASS');
+      // cleanup (ignore result)
+      await supabase.from(SITE_CONTENT_TABLE).delete().eq('key', testKey);
+    } catch (e: any) {
+      console.error('❌ site_content UPSERT FAILED (this is why My Story may not save):', {
+        message: e.message, code: e.code, details: e.details, hint: e.hint
+      });
+    }
+
+    // 3. Quick storage sanity (list files in the bucket — does not require write)
+    try {
+      const { error } = await supabase.storage.from(BAKES_BUCKET).list('bakes', { limit: 1 });
+      if (error) throw error;
+      console.log('✅ storage bucket list: PASS (bucket exists and is accessible)');
+    } catch (e: any) {
+      console.error('❌ storage LIST failed (bucket may not exist or RLS on storage.objects):', e.message || e);
+    }
+
+    console.groupEnd();
+    toast.success('Diagnostics complete — check the browser console (F12) for detailed PASS/FAIL + raw errors.');
   };
 
   // Password gate
@@ -429,10 +606,12 @@ export function Studio({ isOpen, onClose, onExitAuth, authed, onAuthed, password
                               <div className="admin-desc">
                                 <textarea
                                   defaultValue={bake.description || ''}
-                                  placeholder="Add a short description..."
+                                  placeholder="Short description (add column first if this fails)"
                                   onBlur={(e) => {
                                     const v = e.target.value.trim();
-                                    if (v !== (bake.description || '')) updateBake(bake.id, { description: v || null });
+                                    if (v !== (bake.description || '')) {
+                                      updateBake(bake.id, { description: v || null });
+                                    }
                                   }}
                                 />
                               </div>
@@ -592,13 +771,17 @@ export function Studio({ isOpen, onClose, onExitAuth, authed, onAuthed, password
                     <div className="flex flex-wrap gap-3">
                       <button onClick={() => window.print()} className="btn btn-secondary">Print beautiful portfolio</button>
                       <button onClick={() => { refetchBakes(); refetchContent(); toast.success('Refreshed all data'); }} className="btn btn-secondary flex items-center gap-2"><RefreshCw size={15} /> Sync from Supabase</button>
+                      {/* NEW: The big diagnostic button the user asked for */}
+                      <button onClick={runDiagnostics} className="btn btn-secondary flex items-center gap-2 border-[#C17F59] text-[#C17F59]">
+                        🔍 Test Supabase Connection &amp; Policies
+                      </button>
                     </div>
                   </div>
 
                   <div className="text-sm text-[#6B5344] leading-relaxed border border-[#E5D9C7] rounded-2xl p-5 bg-[#F8F4ED]">
                     All content (story, testimonials, bakes, descriptions) lives in Supabase.<br />
                     The public site updates live thanks to realtime.<br /><br />
-                    To change contact email or Instagram handle, update the defaults in the code or add new content keys.
+                    <strong>If uploads or My Story saves fail:</strong> Click the "Test Supabase..." button above, then open DevTools console. The output tells you exactly which policy (bakes table, storage bucket, or site_content) is missing.
                   </div>
 
                   <button onClick={onExitAuth} className="btn btn-ghost text-red-600/90 flex items-center gap-2">

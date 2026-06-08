@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { motion } from 'framer-motion';
 import { useBakes } from '../hooks/useBakes';
 import { BakeCard } from '../components/BakeCard';
 import type { Bake } from '../lib/supabase';
@@ -17,7 +18,7 @@ export function Signature({ onOpenLightbox, onOpenInquiry }: SignatureProps) {
   const filtered = filter === 'all' ? signature : signature.filter(b => b.category === filter);
 
   return (
-    <div className="pt-12 pb-16">
+    <div className="pt-12 pb-20">
       <div className="container">
         <div className="max-w-2xl mb-9">
           <div className="uppercase tracking-[3.5px] text-xs text-[#C17F59]">The Heart of the Kitchen</div>
@@ -39,17 +40,26 @@ export function Signature({ onOpenLightbox, onOpenInquiry }: SignatureProps) {
             {Array.from({ length: 4 }).map((_, i) => <div key={i} className="h-[380px] skeleton rounded-3xl" />)}
           </div>
         ) : filtered.length > 0 ? (
-          <div className="signature-grid">
+          <motion.div 
+            className="signature-grid"
+            initial="hidden"
+            animate="visible"
+            variants={{
+              hidden: {},
+              visible: { transition: { staggerChildren: 0.035 } }
+            }}
+          >
             {filtered.map(bake => (
-              <BakeCard
-                key={bake.id}
-                bake={bake}
-                variant="signature"
-                onClick={() => onOpenLightbox(bake)}
-                onRequest={() => onOpenInquiry(bake.title)}
-              />
+              <motion.div key={bake.id} variants={{ hidden: { opacity: 0, y: 16 }, visible: { opacity: 1, y: 0 } }}>
+                <BakeCard
+                  bake={bake}
+                  variant="signature"
+                  onClick={() => onOpenLightbox(bake)}
+                  onRequest={() => onOpenInquiry(bake.title)}
+                />
+              </motion.div>
             ))}
-          </div>
+          </motion.div>
         ) : (
           <div className="text-center py-16 border border-[#E5D9C7] rounded-3xl bg-white">
             <p className="text-[#6B5344]">No signature items yet in this category. Mark some bakes as “featured” in the Studio.</p>
