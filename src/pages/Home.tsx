@@ -90,16 +90,10 @@ export function Home({ onOpenStudio, onOpenInquiry, onOpenLightbox }: HomeProps)
         </div>
       </section>
 
-      {/* IN THE KITCHEN — beautiful looping first-person video (GOAT emotional touch)
+      {/* IN THE KITCHEN — beautiful looping first-person video 
            First-person POV of a woman kneading dough on a flour-dusted wooden bread board.
            Soft natural lighting, gentle rhythm, warm and intimate feel.
-           IMPORTANT for production: 
-           - Download a high-quality matching video (search Pexels/Mixkit/Coverr for "hands kneading dough pov" or "baker kneading bread first person").
-           - Optimize for web (target <3-5MB): use ffmpeg for webm (VP9) + mp4 (H.264) fallbacks.
-           - Host in /public/videos/kitchen-kneading.webm (and .mp4) and update sources.
-           - Or self-host on CDN / Vercel for best performance and no hotlink issues.
-           Current src is a temporary placeholder baking-related loop for demo.
-           Attributes: autoPlay muted loop playsInline for reliable mobile/desktop muted loop.
+           This section fills the prominent visual space on the page.
       */}
       {/* The video is now the star that fills the large empty visual space */}
       <motion.section 
@@ -134,11 +128,20 @@ export function Home({ onOpenStudio, onOpenInquiry, onOpenLightbox }: HomeProps)
               muted
               loop
               playsInline
+              preload="metadata"
+              poster="https://images.unsplash.com/photo-1601050690597-df0568f70950?w=800&q=80"
               className="w-full h-auto"
               aria-label="First-person POV of a woman kneading dough on a flour-dusted wooden bread board. Soft natural lighting, gentle rhythm, warm and intimate feel."
             >
+              {/* Primary source: the user's provided MP4 */}
               <source src="/videos/kitchen.mp4" type="video/mp4" />
-              Your browser does not support the video tag.
+              {/* 
+                Recommended for production (smaller file, better browser support):
+                1. Generate webm locally: ffmpeg -i kitchen.mp4 -c:v libvpx-vp9 -crf 32 -b:v 800k -c:a libopus -b:a 64k kitchen.webm
+                2. Add the source before the mp4 one (webm first for modern browsers):
+                   <source src="/videos/kitchen.webm" type="video/webm" />
+                3. Commit both files.
+              */}
             </video>
           </div>
           <p className="kitchen-caption">The quiet rhythm of hands, flour, and wood. This is where the magic begins.</p>
