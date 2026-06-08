@@ -12,6 +12,7 @@ createRoot(document.getElementById('root')!).render(
       richColors 
       closeButton 
       className="sonner-toast"
+      duration={4200}
     />
   </StrictMode>,
 )

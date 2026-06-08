@@ -29,6 +29,39 @@ export interface Bake {
   storage_path: string | null;
   display_order: number;
   featured: boolean;
+  description?: string | null;   // NEW: optional rich description for signature items & lightbox
+  created_at: string;
+}
+
+// Editable site content — simple key/value for story sections, taglines, etc.
+// Stored in Supabase so Angel can update everything from Studio without code changes.
+export interface SiteContent {
+  key: string;
+  value: string;
+  updated_at?: string;
+}
+
+// Testimonials — warm, authentic quotes managed entirely in Studio
+export interface Testimonial {
+  id: string;
+  quote: string;
+  name: string;
+  role: string;
+  display_order: number;
+  created_at: string;
+}
+
+// Custom order inquiries submitted from the Contact page or "Request this bake" CTAs.
+// Angel reviews them directly inside the Studio.
+export interface Inquiry {
+  id: string;
+  name: string;
+  email: string;
+  phone?: string | null;
+  inquiry_type: string;           // e.g. "Custom Cake", "Weekly Bread Box", "Special Occasion", "Order Specific Bake"
+  message: string;
+  bake_title?: string | null;     // When coming from a specific signature item
+  handled: boolean;
   created_at: string;
 }
 
@@ -182,6 +215,27 @@ export const SUPABASE_PROJECT_URL = 'https://nikppnqnwtwgwzfktzuu.supabase.co';
 export const BAKES_TABLE = 'bakes';
 export const BAKES_BUCKET = 'bakes';
 
+// New lightweight tables for full content control (Angel edits everything in Studio).
+// These are additive — existing bakes table, policies, and realtime remain 100% untouched.
+export const SITE_CONTENT_TABLE = 'site_content';
+export const TESTIMONIALS_TABLE = 'testimonials';
+export const INQUIRIES_TABLE = 'inquiries';
+
+// Default / fallback content for first run (beautifully written, Angel can instantly replace in Studio)
+export const DEFAULT_STORY: Record<string, string> = {
+  hero_tagline: "Handcrafted with love, baked with joy",
+  about_intro: "Hi, I'm Angel. I bake because it brings people together. Every loaf, cake, and pastry is made by hand with the best ingredients I can find — butter, flour, seasonal fruit, and a whole lot of care.",
+  the_beginning: "I grew up in a tiny kitchen where the smell of cinnamon and rising dough meant home. My grandmother taught me that baking is equal parts precision and generosity. Those early mornings sifting flour and learning to listen to the oven shaped everything I do today.",
+  philosophy: "I believe the best things take time. Slow fermentation, real butter, fruit at its peak. Nothing rushed, nothing artificial. When you take a bite, I want you to taste patience, craft, and the simple happiness of something made just for you.",
+  the_promise: "Small batches only. Everything leaves my kitchen the same day it's baked. No shortcuts — just honest ingredients, time-honored technique, and the quiet joy of feeding the people I love.",
+};
+
+export const DEFAULT_TESTIMONIALS = [
+  { quote: "The sourdough is the best I've had outside of Paris. Crust is perfect, crumb is airy and full of flavor.", name: "Elena M.", role: "Weekly customer" },
+  { quote: "Angel's cinnamon rolls are legendary in our house. We order them for every special occasion.", name: "The Rivera Family", role: "Neighbors" },
+  { quote: "I brought her almond croissants to a brunch and three people asked for the baker's contact. Incredible.", name: "Marcus T.", role: "Regular at the market" },
+];
+
 /**
  * Optional helper you can call from console in dev for quick status.
  */
@@ -193,4 +247,37 @@ export function debugSupabase() {
     clientCreated: !!supabaseInstance,
   });
   return { url: SUPABASE_URL, hasClient: !!supabaseInstance };
+}
+
+/**
+ * Safe fetch for a single piece of site content (returns default if missing).
+ * Used by public pages. Studio writes directly.
+ */
+export async function fetchSiteContent(): Promise<Record<string, string>> {
+  try {
+    const supabase = getSupabase();
+    const { data } = await supabase
+      .from(SITE_CONTENT_TABLE)
+      .select('key, value');
+    
+    const result: Record<string, string> = { ...DEFAULT_STORY };
+    (data || []).forEach((row: any) => {
+      if (row.key && row.value != null) result[row.key] = row.value;
+    });
+    return result;
+  } catch (e) {
+    console.warn('[Supabase] site_content fetch failed, using defaults', e);
+    return { ...DEFAULT_STORY };
+  }
+}
+
+/**
+ * Upsert a content key (simple & reliable).
+ */
+export async function saveSiteContent(key: string, value: string) {
+  const supabase = getSupabase();
+  const { error } = await supabase
+    .from(SITE_CONTENT_TABLE)
+    .upsert({ key, value }, { onConflict: 'key' });
+  if (error) throw error;
 }
