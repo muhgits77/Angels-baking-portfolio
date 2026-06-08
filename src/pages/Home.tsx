@@ -110,18 +110,16 @@ export function Home({ onOpenStudio, onOpenInquiry, onOpenLightbox }: HomeProps)
           </div>
           <div className="kitchen-video-container">
             {/* 
-              GOAT POLISH: Filling the large empty square/space with the user's provided short video clip.
-              Video: First-person POV of a woman kneading dough on a flour-dusted wooden bread board.
-              Soft natural lighting, gentle rhythm, warm and intimate feel — perfect emotional centerpiece.
-              
-              File: Copied from /home/bppc/Desktop/grok-video-....mp4 to /public/videos/kitchen.mp4 (2.8MB).
-              Also referenced via the Grok link provided: https://grok.com/imagine/post/0d0d5060-54a4-43a0-993a-c19a5b16bd91
-              
-              Implementation:
-              - Autoplay, muted, loop, playsInline for seamless, silent, reliable playback (mobile + desktop).
-              - Contained in .kitchen-video-container (styled with warm frame + overlay for premium bakery aesthetic).
-              - This directly addresses the "large empty square" by placing a beautiful, relevant looping clip in a prominent dedicated "In the Kitchen" section right after the cinematic hero.
-              - The section was intentionally designed as the perfect home for such personal, intimate footage.
+              PRODUCTION-READY "In the Kitchen" video:
+              - Source: original grok-video-4a0cb244-61b2-4645-9b64-49a9cdcd0611.mp4 (first-person kneading POV, ~6s loop)
+              - Assets (in public/videos/):
+                  kitchen.webm  (optimized VP9, ~969KB, no audio since muted)
+                  kitchen.mp4   (original 2.8MB, full quality fallback)
+                  kitchen-poster.jpg (extracted frame at 2.2s for instant visual + loading state)
+              - <video> attrs: autoplay muted loop playsInline preload="metadata" + poster (all required for reliable mobile/desktop)
+              - webm first (modern browsers), mp4 fallback
+              - CSS handles portrait 2:3 aspect with elegant warm frame + centered matte presentation
+              - Poster provides excellent static fallback if video doesn't autoplay or during load
             */}
             <video
               autoPlay
@@ -129,19 +127,12 @@ export function Home({ onOpenStudio, onOpenInquiry, onOpenLightbox }: HomeProps)
               loop
               playsInline
               preload="metadata"
-              poster="https://images.unsplash.com/photo-1601050690597-df0568f70950?w=800&q=80"
+              poster="/videos/kitchen-poster.jpg"
               className="w-full h-auto"
               aria-label="First-person POV of a woman kneading dough on a flour-dusted wooden bread board. Soft natural lighting, gentle rhythm, warm and intimate feel."
             >
-              {/* Primary source: the user's provided MP4 */}
+              <source src="/videos/kitchen.webm" type="video/webm" />
               <source src="/videos/kitchen.mp4" type="video/mp4" />
-              {/* 
-                Recommended for production (smaller file, better browser support):
-                1. Generate webm locally: ffmpeg -i kitchen.mp4 -c:v libvpx-vp9 -crf 32 -b:v 800k -c:a libopus -b:a 64k kitchen.webm
-                2. Add the source before the mp4 one (webm first for modern browsers):
-                   <source src="/videos/kitchen.webm" type="video/webm" />
-                3. Commit both files.
-              */}
             </video>
           </div>
           <p className="kitchen-caption">The quiet rhythm of hands, flour, and wood. This is where the magic begins.</p>

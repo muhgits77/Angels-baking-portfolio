@@ -318,7 +318,7 @@ textarea.input { min-height: 120px; resize: vertical; line-height: 1.6; }
 */
 .kitchen-video-container {
   position: relative;
-  max-width: 860px; 
+  max-width: 620px; 
   margin: 0 auto;
   padding: 0.5rem;
   border-radius: calc(var(--radius-2xl) + 8px);
@@ -327,19 +327,21 @@ textarea.input { min-height: 120px; resize: vertical; line-height: 1.6; }
               0 0 0 1px rgba(212, 165, 116, 0.15) inset;
   background: linear-gradient(145deg, #3a2f24, #2f261f);
   /* 
-    GOAT square-filling treatment: 
-    The container is sized to create a strong, prominent focal "square" presence (max-width tuned for balance).
-    The inner video keeps its natural aspect (important for the kneading action) while the beautiful warm frame makes the whole element fill and command the large empty visual space on the page.
-    If you want the *video itself* cropped to a perfect square, change aspect-ratio to 1 / 1 below and it will center/crop nicely.
+    Portrait video treatment (2:3 source from the kneading clip):
+    - Narrower container (max 620px) + centered narrower video (max 520px) creates a beautiful matted "window" frame.
+    - Full natural aspect preserved (no cropping of hands/action).
+    - The warm dark frame + subtle gradient overlay gives premium intimate bakery feel.
+    - max-height on video keeps section balanced on desktop while remaining prominent.
   */
 }
 .kitchen-video-container video {
   width: 100%;
+  max-width: 520px;
   height: auto;
+  margin: 0 auto;
   display: block;
-  aspect-ratio: 16 / 9; 
-  object-fit: cover;
   border-radius: var(--radius-2xl);
+  /* Natural 2:3 aspect from source; no forced aspect-ratio to avoid distortion/cropping */
 }
 .kitchen-video-container::after {
   content: '';
