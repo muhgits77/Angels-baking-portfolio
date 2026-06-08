@@ -1,16 +1,21 @@
 /**
- * useBakes hook — Vercel Blob edition
+ * useBakes hook — Supabase Data Layer (Hardened with Realtime + Polling Fallback)
  *
- * Central (and only) data layer.
- * - Fetches the current list of bakes from /api/bakes
- * - The server reads a JSON manifest stored in Vercel Blob (manifest/bakes.json)
- * - No localStorage ever.
- * - No realtime (we refetch after mutations in the Studio for simplicity and reliability).
- * - Returns sorted bakes (by display_order then created_at).
+ * The single source of truth for all bake data. Pure Supabase, zero localStorage.
+ *
+ * HARDENED IMPROVEMENTS:
+ * - Full postgres_changes realtime subscription for instant gallery + Studio updates.
+ * - GRACEFUL FALLBACK: If realtime fails to subscribe (common on some networks/VPNs/firewalls),
+ *   automatically starts polling every 30 seconds so the UI still eventually reflects changes.
+ * - Very verbose console logging for connection status, errors, and fallback activation (great for debugging on phone via remote console).
+ * - Optimistic local sorting after patches so UI feels instant even before server roundtrips.
+ * - Manual refetch() exposed for Studio "Refresh" button and after critical mutations as safety net.
+ *
+ * Realtime is preferred. Polling is only a reliable last resort.
  */
 
-import { useEffect, useState, useCallback } from 'react';
-import type { Bake } from '../lib/bakes';
+import { useEffect, useState, useCallback, useRef } from 'react';
+import { getSupabase, type Bake, BAKES_TABLE } from '../lib/supabase';
 
 interface UseBakesResult {
   bakes: Bake[];
@@ -19,46 +24,152 @@ interface UseBakesResult {
   refetch: () => Promise<void>;
 }
 
+const POLL_INTERVAL_MS = 30000; // 30s — good balance for a personal portfolio
+
 export function useBakes(): UseBakesResult {
   const [bakes, setBakes] = useState<Bake[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchBakes = useCallback(async () => {
-    try {
-      setError(null);
-      const res = await fetch('/api/bakes', {
-        cache: 'no-store',
-      });
+  // Refs for cleanup of realtime + polling
+  const channelRef = useRef<ReturnType<ReturnType<typeof getSupabase>['channel']> | null>(null);
+  const pollIntervalRef = useRef<number | null>(null);
+  const usingPollingRef = useRef(false);
 
-      if (!res.ok) {
-        throw new Error(`Failed to load bakes: ${res.status}`);
+  const clearPolling = useCallback(() => {
+    if (pollIntervalRef.current) {
+      clearInterval(pollIntervalRef.current);
+      pollIntervalRef.current = null;
+      if (usingPollingRef.current) {
+        console.log('[useBakes] Polling stopped (realtime recovered or unmount).');
+        usingPollingRef.current = false;
       }
-
-      const data: Bake[] = await res.json();
-
-      // Ensure stable sort (same logic the server and Studio use)
-      const sorted = [...(data || [])].sort((a, b) => {
-        if (a.display_order !== b.display_order) {
-          return a.display_order - b.display_order;
-        }
-        return a.created_at.localeCompare(b.created_at);
-      });
-
-      setBakes(sorted);
-    } catch (err: any) {
-      console.error('Failed to fetch bakes from /api/bakes:', err);
-      setError(err.message || 'Failed to load gallery');
-      // Keep previous data on error so UI doesn't flash empty
-    } finally {
-      setLoading(false);
     }
   }, []);
 
-  // Initial load only (no realtime subscription)
+  const startPolling = useCallback(() => {
+    clearPolling();
+    usingPollingRef.current = true;
+    console.warn(
+      `[useBakes] Realtime unavailable — falling back to polling every ${POLL_INTERVAL_MS / 1000}s. ` +
+      'Gallery will still update, just not instantly. Check Supabase realtime settings / network.'
+    );
+
+    pollIntervalRef.current = window.setInterval(() => {
+      console.log('[useBakes] Polling fetch...');
+      fetchBakesInternal().catch((e) => console.error('[useBakes] Poll fetch failed:', e));
+    }, POLL_INTERVAL_MS);
+  }, []);
+
+  const fetchBakesInternal = useCallback(async () => {
+    const supabase = getSupabase();
+
+    const { data, error: fetchError } = await supabase
+      .from(BAKES_TABLE)
+      .select('*')
+      .order('display_order', { ascending: true })
+      .order('created_at', { ascending: true });
+
+    if (fetchError) throw fetchError;
+
+    const sorted = sortBakes((data as Bake[]) || []);
+    setBakes(sorted);
+    return sorted;
+  }, []);
+
+  const fetchBakes = useCallback(async () => {
+    try {
+      setError(null);
+      await fetchBakesInternal();
+    } catch (err: any) {
+      console.error('[useBakes] Fetch failed:', err);
+      setError(err.message || 'Failed to load bakes from Supabase');
+    } finally {
+      setLoading(false);
+    }
+  }, [fetchBakesInternal]);
+
+  // Initial fetch + attempt realtime. Graceful polling fallback on failure.
   useEffect(() => {
-    fetchBakes();
-  }, [fetchBakes]);
+    let isMounted = true;
+
+    const setup = async () => {
+      await fetchBakes();
+
+      if (!isMounted) return;
+
+      try {
+        const supabase = getSupabase();
+
+        // Clean any previous
+        if (channelRef.current) {
+          supabase.removeChannel(channelRef.current);
+        }
+
+        const channel = supabase
+          .channel('bakes-realtime-v2')
+          .on(
+            'postgres_changes',
+            { event: '*', schema: 'public', table: BAKES_TABLE },
+            (payload) => {
+              // Realtime patch — keep sorted
+              if (payload.eventType === 'INSERT') {
+                const newBake = payload.new as Bake;
+                setBakes((prev) => {
+                  if (prev.some((b) => b.id === newBake.id)) return prev;
+                  return sortBakes([...prev, newBake]);
+                });
+              } else if (payload.eventType === 'UPDATE') {
+                const updated = payload.new as Bake;
+                setBakes((prev) =>
+                  sortBakes(prev.map((b) => (b.id === updated.id ? updated : b)))
+                );
+              } else if (payload.eventType === 'DELETE') {
+                const deletedId = (payload.old as any).id as string;
+                setBakes((prev) => prev.filter((b) => b.id !== deletedId));
+              }
+            }
+          )
+          .subscribe((status, err) => {
+            if (status === 'SUBSCRIBED') {
+              console.log('[useBakes] ✅ Realtime connected (postgres_changes live).');
+              clearPolling(); // stop any fallback
+            }
+
+            if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || err) {
+              console.warn('[useBakes] Realtime subscribe issue:', status, err);
+              if (!usingPollingRef.current) {
+                startPolling();
+              }
+            }
+          });
+
+        channelRef.current = channel;
+      } catch (e: any) {
+        console.error('[useBakes] Failed to create realtime channel:', e);
+        if (!usingPollingRef.current) {
+          startPolling();
+        }
+      }
+    };
+
+    setup();
+
+    return () => {
+      isMounted = false;
+      clearPolling();
+
+      if (channelRef.current) {
+        try {
+          const supabase = getSupabase();
+          supabase.removeChannel(channelRef.current);
+        } catch (e) {
+          // ignore cleanup errors
+        }
+        channelRef.current = null;
+      }
+    };
+  }, [fetchBakes, startPolling, clearPolling]);
 
   const refetch = useCallback(async () => {
     setLoading(true);
@@ -66,4 +177,14 @@ export function useBakes(): UseBakesResult {
   }, [fetchBakes]);
 
   return { bakes, loading, error, refetch };
+}
+
+/** Consistent sort helper (used after both server fetches and realtime patches) */
+function sortBakes(list: Bake[]): Bake[] {
+  return [...list].sort((a, b) => {
+    if (a.display_order !== b.display_order) {
+      return a.display_order - b.display_order;
+    }
+    return a.created_at.localeCompare(b.created_at);
+  });
 }

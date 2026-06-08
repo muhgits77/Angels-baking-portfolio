@@ -7,18 +7,19 @@ A beautiful, warm, premium portfolio for a passionate baker. Built from a clean 
 ## Tech Stack
 - Vite + React 19 + TypeScript
 - Tailwind CSS (v4 via import)
-- Vercel Blob (for images + JSON manifest)
+- Supabase (table + public storage bucket + realtime)
 - Framer Motion + Sonner (toasts) + Lucide icons
 
 ## Key Requirements Met
-- Beautiful warm mouth-watering design focused on baked goods (unchanged)
-- All images + metadata stored via Vercel Blob only
-- No localStorage data fallback whatsoever
-- Studio: password-protected full CRUD (upload, title, categorize, reorder, delete, featured toggle)
-- Simple & reliable — works great over VPNs and on mobile
+- Beautiful warm mouth-watering design focused on baked goods
+- 100% Supabase — no localStorage data fallback ever
+- Clean browser-only Supabase client (SSR-safe, works with TanStack Start etc.)
+- Realtime updates via postgres_changes
+- Studio: password-protected full CRUD (upload from camera/library, title, category, reorder via display_order, delete, featured toggle)
+- Fully mobile-first — easy for Angel to manage photos from her phone
 - Masonry gallery + category filters
-- All requested sections: Hero, About, Signature Items, Gallery, Testimonials, Contact
-- Production-ready for Vercel (only needs two env vars)
+- All sections: Hero, About, Signature Items, Gallery, Testimonials, Contact
+- Production-ready for Vercel (only needs VITE_SUPABASE_* + VITE_STUDIO_PASSWORD)
 
 ---
 
@@ -39,53 +40,108 @@ cp .env.example .env
 
 Edit `.env`:
 ```env
-VERCEL_BLOB_READ_WRITE_TOKEN=your_blob_rw_token_here
+VITE_SUPABASE_URL=https://nikppnqnwtwgwzfktzuu.supabase.co
+VITE_SUPABASE_ANON_KEY=your-anon-public-key
 VITE_STUDIO_PASSWORD=your-strong-studio-password
 ```
 
-**Never commit real keys.** The blob token must stay server-only (no `VITE_` prefix).
+**Never commit real keys.**
 
-### 3. Set up Vercel Blob (one-time)
+### 3. Supabase Setup (one-time)
 
-1. Go to your project on Vercel → **Storage** tab.
-2. Click **Create Blob Store** (or "Connect Blob").
-3. Choose a name (e.g. `angels-baking`).
-4. After creation, go to the store → copy the **READ_WRITE_TOKEN**.
-5. Paste it into `VERCEL_BLOB_READ_WRITE_TOKEN` in your Vercel project Environment Variables **and** in your local `.env`.
+You are using this project: https://nikppnqnwtwgwzfktzuu.supabase.co
 
-That's all the "database" you need. Images and a small `manifest/bakes.json` file will be created automatically on first upload.
+#### Table: public.bakes
 
-No tables, no RLS, no policies to manage. Much simpler.
+The table should already exist with these columns:
+- id (uuid, primary key)
+- title (text)
+- category (text)
+- image_url (text)
+- storage_path (text, nullable)
+- display_order (integer)
+- featured (boolean)
+- created_at (timestamptz)
+
+If needed, you can create it via SQL Editor:
+
+```sql
+create table if not exists public.bakes (
+  id uuid primary key default gen_random_uuid(),
+  title text not null,
+  category text not null,
+  image_url text not null,
+  storage_path text,
+  display_order integer not null default 0,
+  featured boolean not null default false,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists bakes_display_order_idx on public.bakes (display_order, created_at);
+```
+
+#### Enable RLS + Policies (public read + write for this simple portfolio)
+
+```sql
+alter table public.bakes enable row level security;
+
+-- Public can read (gallery is public)
+create policy "Public read" on public.bakes for select using (true);
+
+-- Anyone can insert (Studio uploads via anon key)
+create policy "Public insert" on public.bakes for insert with check (true);
+
+-- Anyone can update (title, category, order, featured)
+create policy "Public update" on public.bakes for update using (true) with check (true);
+
+-- Anyone can delete
+create policy "Public delete" on public.bakes for delete using (true);
+```
+
+#### Storage Bucket: `bakes` (must be public)
+
+1. Go to Storage in the Supabase dashboard.
+2. Create a bucket named exactly **`bakes`**.
+3. Make the bucket **Public**.
+4. Add these policies under the bucket (Storage → Policies):
+
+```sql
+-- Public read
+create policy "Public read" on storage.objects for select using (bucket_id = 'bakes');
+
+-- Public upload
+create policy "Public insert" on storage.objects for insert with check (bucket_id = 'bakes');
+
+-- Public update (rarely needed)
+create policy "Public update" on storage.objects for update using (bucket_id = 'bakes');
+
+-- Public delete (for Studio remove)
+create policy "Public delete" on storage.objects for delete using (bucket_id = 'bakes');
+```
+
+That's it. The Studio can now upload images and manage the bakes table.
 
 ### 4. Run locally
-
-For viewing the public site (gallery):
 ```bash
 npm run dev
 ```
 
-For full Studio functionality (uploads, deletes, etc.) during development you need the API routes:
+Open http://localhost:5173
 
-```bash
-# Recommended for testing the Studio
-npx vercel dev
-```
+Click **Studio** (top right) and enter the password from `VITE_STUDIO_PASSWORD`.
 
-Then open http://localhost:3000 (or the port vercel dev uses).
-
-Click **Studio** and enter the password from `VITE_STUDIO_PASSWORD`.
-
-> Note: Plain `npm run dev` will show the gallery fine (it will just get an empty list until you deploy or use `vercel dev` with a valid token).
+The app will connect directly to your Supabase project using the anon key. Realtime works out of the box in dev.
 
 ### 5. Deploy to Vercel
-1. Push your code to GitHub.
-2. Import the repository in Vercel.
-3. In **Project Settings → Environment Variables**, add:
-   - `VERCEL_BLOB_READ_WRITE_TOKEN` (the read/write token — **not** prefixed with VITE_)
+1. Push to GitHub.
+2. Import the repo in Vercel.
+3. Add these Environment Variables (Project Settings → Environment Variables):
+   - `VITE_SUPABASE_URL`
+   - `VITE_SUPABASE_ANON_KEY`
    - `VITE_STUDIO_PASSWORD`
-4. Redeploy.
+4. Deploy.
 
-Vercel automatically runs `npm run build`. The `/api` folder becomes serverless functions that securely talk to Blob.
+Vercel will run `npm run build`. No extra serverless functions are needed — the client talks directly to Supabase (same model as the previous working Supabase version).
 
 ---
 
@@ -110,44 +166,47 @@ This is dramatically simpler than a traditional database setup while being very 
 - **Reorder**: Use the up/down arrows (big touch targets)
 - **Feature / Unfeature**: Star icon adds or removes from the Signature Items section
 - **Delete**: Trash icon (with confirmation)
-- All changes are saved to Vercel Blob. Refresh the public site (or wait for cache) to see updates. The Studio itself refetches after every action.
+- All changes are saved instantly to Supabase. Realtime keeps both the public gallery and Studio in sync.
 
 ---
 
 ## Environment Variables Reference
 
-| Variable                        | Required | Description                                      |
-|---------------------------------|----------|--------------------------------------------------|
-| VERCEL_BLOB_READ_WRITE_TOKEN    | Yes      | Vercel Blob RW token (server only, no VITE_ prefix) |
-| VITE_STUDIO_PASSWORD            | Yes      | Password to access the Studio admin (client)     |
+| Variable                  | Required | Description                                      |
+|---------------------------|----------|--------------------------------------------------|
+| VITE_SUPABASE_URL         | Yes      | Your Supabase project URL                        |
+| VITE_SUPABASE_ANON_KEY    | Yes      | Public anon key (safe to expose in client)       |
+| VITE_STUDIO_PASSWORD      | Yes      | Password to access the Studio admin (client)     |
 
 ---
 
 ## Architecture Notes (important)
 
-- No Supabase at all.
-- Image blobs and the `manifest/bakes.json` live in your Vercel Blob store.
-- Client never sees `VERCEL_BLOB_READ_WRITE_TOKEN`.
-- `useBakes` simply fetches `/api/bakes` (the server reads the manifest).
-- After every Studio action we persist the full list + (when deleting) the pathname(s) to remove.
-- Reordering always re-sequences `display_order` 0..N for maximum reliability.
-- **Zero** data in localStorage.
+- Supabase client is instantiated only in the browser via `getSupabase()` (see src/lib/supabase.ts).
+- The `useBakes` hook performs the initial fetch + maintains a realtime subscription (`postgres_changes` on the bakes table).
+- All mutations (upload via storage + table, update, delete, reorder) talk directly to Supabase.
+- Realtime delivers INSERT/UPDATE/DELETE events to both the public gallery and the Studio.
+- Reordering re-sequences `display_order` across the affected rows for reliability.
+- **Zero** data is ever stored in localStorage. Supabase is the only source of truth.
 
 ---
 
 ## Troubleshooting
 
-**Uploads / Studio actions fail with "token not configured"**
-→ Make sure `VERCEL_BLOB_READ_WRITE_TOKEN` is set in Vercel Environment Variables (and in `.env` when using `vercel dev`). Do **not** prefix it with `VITE_`.
+**"Missing Supabase configuration" or client errors**
+→ Make sure `.env` contains valid `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`. Restart the dev server after editing `.env`.
 
-**Gallery is empty even after uploading**
-→ Use `vercel dev` locally or deploy. Plain `vite` dev server does not run the `/api` functions.
+**Uploads fail**
+→ Check that the `bakes` storage bucket exists and is public, and that the RLS policies on both the table and storage allow insert for the anon role.
 
-**Images don't appear or 404 after delete**
-→ The manifest and the actual image blobs are separate. Deleting always removes both the manifest entry and the blob via its `pathname`.
+**Realtime not reflecting changes**
+→ Check the browser console. The subscription uses the public anon key and requires the table policies to be correctly set.
 
 **Studio password doesn't work**
-→ Verify `VITE_STUDIO_PASSWORD` matches exactly (case sensitive, no extra spaces).
+→ Verify `VITE_STUDIO_PASSWORD` exactly matches what you type (including any special characters). The check is case-sensitive.
+
+**Images 404 after delete**
+→ Deletion removes the row and then attempts to remove the storage object by `storage_path`. If the path was somehow lost, the row will still be gone.
 
 ---
 

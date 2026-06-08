@@ -1,19 +1,26 @@
 /**
  * Angel's Baking Portfolio
- * 
- * Vercel Blob Storage edition (clean migration from Supabase).
- * 
- * - All images stored in Vercel Blob (public).
- * - Metadata lives in a single JSON manifest also stored in Vercel Blob (manifest/bakes.json).
- * - Writes go through simple /api/* serverless routes so VERCEL_BLOB_READ_WRITE_TOKEN
- *   never leaves the server.
- * - No Supabase, no realtime, no localStorage for data.
- * - Studio remains fully mobile-friendly with large touch targets.
- * - Gallery + Studio both load data from /api/bakes.
- * 
- * Required env vars (Vercel + local .env):
- *   VERCEL_BLOB_READ_WRITE_TOKEN   (server only — for uploads/deletes)
- *   VITE_STUDIO_PASSWORD           (client — simple password gate)
+ *
+ * Supabase edition — clean, production-ready single-page portfolio.
+ *
+ * - All data lives in Supabase (public.bakes table + public 'bakes' storage bucket).
+ * - No localStorage fallback whatsoever. Every read/write goes through Supabase.
+ * - Supabase client is created lazily and ONLY in the browser (SSR-safe, works with TanStack Start, Next.js, etc.).
+ * - Full realtime via postgres_changes — gallery and Studio update live.
+ * - Studio is password-protected using VITE_STUDIO_PASSWORD (simple client-side gate).
+ * - Full mobile-first CRUD:
+ *     • Upload photos directly from phone camera or library
+ *     • Edit title, category, featured flag
+ *     • Reorder via up/down (updates display_order)
+ *     • Delete (removes both row and storage object)
+ * - Warm, premium bakery aesthetic (unchanged from design system).
+ *
+ * Environment variables required:
+ *   VITE_SUPABASE_URL
+ *   VITE_SUPABASE_ANON_KEY
+ *   VITE_STUDIO_PASSWORD
+ *
+ * Uses the project: https://nikppnqnwtwgwzfktzuu.supabase.co
  */
 
 import { useState, useMemo, useRef } from 'react';
@@ -24,12 +31,16 @@ import {
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
 
-import type { Bake } from './lib/bakes';
 import { 
+  getSupabase, 
+  type Bake, 
   CATEGORIES, 
   CATEGORY_LABELS, 
-  STUDIO_PASSWORD 
-} from './lib/bakes';
+  STUDIO_PASSWORD,
+  isSupabaseConfigured,
+  BAKES_TABLE,
+  BAKES_BUCKET 
+} from './lib/supabase';
 import { useBakes } from './hooks/useBakes';
 
 // ============================================
@@ -94,8 +105,13 @@ export default function App() {
   // STUDIO AUTH
   // ============================================
   const openStudio = () => {
-    // No more Supabase config check — we only need the password client-side.
-    // Server-side routes will return clear errors if VERCEL_BLOB_READ_WRITE_TOKEN is missing.
+    if (!isSupabaseConfigured()) {
+      toast.error(
+        'Supabase not configured. In Vercel: add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to Environment Variables, then redeploy. ' +
+        'Locally: check your .env file.'
+      );
+      return;
+    }
     setIsStudioOpen(true);
     setMobileMenuOpen(false);
     if (!studioAuthed) {
@@ -114,8 +130,9 @@ export default function App() {
     if (e) e.preventDefault();
     
     if (!STUDIO_PASSWORD) {
-      // Development convenience — warn loudly
-      setPasswordError('No studio password set. Add VITE_STUDIO_PASSWORD to your environment.');
+      setPasswordError(
+        'No studio password configured. Set VITE_STUDIO_PASSWORD in your .env (local) or Vercel Environment Variables, then restart/redeploy.'
+      );
       return;
     }
     
@@ -125,7 +142,7 @@ export default function App() {
       setPasswordInput('');
       toast.success('Welcome to the studio');
     } else {
-      setPasswordError('Incorrect password');
+      setPasswordError('Incorrect password. Double-check VITE_STUDIO_PASSWORD in Vercel env vars or .env.');
       toast.error('Incorrect password');
     }
   };
@@ -138,8 +155,9 @@ export default function App() {
   };
 
   // ============================================
-  // UPLOAD + CRUD (all go through Vercel Blob via /api routes)
-  // No localStorage. Manifest + images live in Blob.
+  // UPLOAD + CRUD — All operations go directly to Supabase
+  // Table: public.bakes | Storage: public 'bakes' bucket
+  // No localStorage. Realtime keeps UI in sync.
   // ============================================
   const resetUploadForm = () => {
     setUploadFile(null);
@@ -190,12 +208,10 @@ export default function App() {
   };
 
   /**
-   * Upload flow (mobile friendly):
-   * 1. POST the raw file to /api/upload (server uses the RW token)
-   * 2. Receive public URL + pathname
-   * 3. Create a new Bake record client-side
-   * 4. Append to current list with next display_order
-   * 5. POST the full list to /api/bakes → server writes the manifest JSON
+   * Upload a new bake photo (mobile-optimized).
+   * 1. Upload file to Supabase Storage (bakes bucket) → get public URL + storage_path
+   * 2. Insert row into bakes table with next display_order
+   * 3. Realtime will push the new row into the UI automatically.
    */
   const uploadBake = async () => {
     if (!uploadFile) {
@@ -208,57 +224,53 @@ export default function App() {
     }
 
     setIsUploading(true);
-    setUploadProgress(10);
+    setUploadProgress(5);
 
     try {
-      // 1. Upload the image file via our secure API route
-      const formData = new FormData();
-      formData.append('file', uploadFile);
+      const supabase = getSupabase();
 
-      const uploadRes = await fetch('/api/upload', {
-        method: 'POST',
-        body: formData,
-      });
+      // 1. Upload the image to the public 'bakes' storage bucket
+      const fileExt = uploadFile.name.split('.').pop();
+      const fileName = `${Date.now()}-${Math.random().toString(36).slice(2)}.${fileExt}`;
+      const storagePath = `bakes/${fileName}`;
 
-      if (!uploadRes.ok) {
-        const err = await uploadRes.json().catch(() => ({}));
-        throw new Error(err.error || 'Image upload failed');
-      }
+      const { error: uploadError } = await supabase.storage
+        .from(BAKES_BUCKET)
+        .upload(storagePath, uploadFile, {
+          cacheControl: '3600',
+          upsert: false,
+        });
 
-      const { url: imageUrl, pathname } = await uploadRes.json();
-      setUploadProgress(60);
+      if (uploadError) throw uploadError;
+      setUploadProgress(55);
 
-      if (!imageUrl || !pathname) {
-        throw new Error('Invalid response from upload service');
-      }
+      // 2. Get the permanent public URL
+      const { data: publicUrlData } = supabase.storage
+        .from(BAKES_BUCKET)
+        .getPublicUrl(storagePath);
 
-      // 2. Build the new bake record
+      const imageUrl = publicUrlData.publicUrl;
+      if (!imageUrl) throw new Error('Failed to obtain public URL for uploaded image');
+
+      // 3. Determine next display order (append to end)
       const maxOrder = bakes.length > 0
         ? Math.max(...bakes.map((b) => b.display_order))
         : -1;
 
-      const newBake: Bake = {
-        id: crypto.randomUUID(),
+      // 4. Insert the metadata row. Realtime subscription will deliver it to the UI.
+      const { error: insertError } = await supabase.from(BAKES_TABLE).insert({
         title: uploadTitle.trim(),
         category: uploadCategory,
         image_url: imageUrl,
-        pathname,
+        storage_path: storagePath,
         display_order: maxOrder + 1,
         featured: uploadFeatured,
-        created_at: new Date().toISOString(),
-      };
-
-      // 3. Optimistic new list + persist via manifest
-      const updatedList = [...bakes, newBake];
-
-      const saveRes = await fetch('/api/bakes', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ bakes: updatedList }),
       });
 
-      if (!saveRes.ok) {
-        throw new Error('Failed to save to gallery');
+      if (insertError) {
+        // Attempt to clean up the orphaned storage object
+        await supabase.storage.from(BAKES_BUCKET).remove([storagePath]).catch(() => {});
+        throw insertError;
       }
 
       setUploadProgress(100);
@@ -266,83 +278,95 @@ export default function App() {
 
       resetUploadForm();
 
-      // Refresh from source of truth
-      await refetch();
+      // Safety refetch (realtime usually handles it, but this is robust)
+      setTimeout(() => {
+        refetch().catch(() => {});
+      }, 300);
 
     } catch (err: any) {
-      console.error('Upload failed:', err);
-      toast.error(err.message || 'Upload failed. Please try again.');
-      // Best effort refresh to stay consistent
-      refetch().catch(() => {});
+      console.error('[Studio] Upload failed:', err);
+
+      const friendly =
+        err.message ||
+        'Upload failed. Common fixes:\n' +
+        '• VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY set correctly in Vercel Environment Variables (or local .env)\n' +
+        '• "bakes" storage bucket exists and is PUBLIC in Supabase Dashboard\n' +
+        '• RLS policies on bakes table and storage bucket allow insert for the anon role\n' +
+        '• You are on a stable network (mobile data sometimes works better than VPN)\n\n' +
+        'Check browser console for the full error.';
+
+      toast.error(friendly, { duration: 8000 });
     } finally {
       setIsUploading(false);
       setUploadProgress(0);
     }
   };
 
-  /**
-   * Persist a new version of the full list to the manifest.
-   * Used by all mutations (title, category, reorder, featured, delete).
-   */
-  const persistBakes = async (newList: Bake[], deletePathnames?: string[]) => {
-    try {
-      const res = await fetch('/api/bakes', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ bakes: newList, deletePathnames }),
-      });
-
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || 'Failed to save changes');
-      }
-
-      // Refresh to get canonical sorted data from the manifest
-      await refetch();
-      return true;
-    } catch (err: any) {
-      console.error('persistBakes error:', err);
-      toast.error(err.message || 'Failed to save changes');
-      // Try to recover latest state
-      await refetch().catch(() => {});
-      return false;
-    }
-  };
-
-  // Update title (inline in studio) — optimistic then persist full list
+  // Update title inline in Studio (direct Supabase update + realtime)
   const updateTitle = async (id: string, newTitle: string) => {
     const trimmed = newTitle.trim();
     if (!trimmed) return;
 
-    const updated = bakes.map((b) =>
-      b.id === id ? { ...b, title: trimmed } : b
-    );
+    try {
+      const supabase = getSupabase();
+      const { error } = await supabase
+        .from(BAKES_TABLE)
+        .update({ title: trimmed })
+        .eq('id', id);
 
-    await persistBakes(updated);
+      if (error) throw error;
+      // Realtime will update the list automatically
+    } catch (err: any) {
+      toast.error(
+        'Failed to update title. ' +
+        'Check that VITE_SUPABASE_* are set in Vercel env vars and the table RLS policies allow updates.'
+      );
+      console.error(err);
+    }
   };
 
-  // Update category
+  // Update category (direct + realtime)
   const updateCategory = async (id: string, newCategory: (typeof CATEGORIES)[number]) => {
-    const updated = bakes.map((b) =>
-      b.id === id ? { ...b, category: newCategory } : b
-    );
+    try {
+      const supabase = getSupabase();
+      const { error } = await supabase
+        .from(BAKES_TABLE)
+        .update({ category: newCategory })
+        .eq('id', id);
 
-    const ok = await persistBakes(updated);
-    if (ok) toast.success('Category updated');
+      if (error) throw error;
+      toast.success('Category updated');
+    } catch (err: any) {
+      toast.error(
+        'Failed to update category. Verify Supabase config in Vercel and that RLS policies permit updates on the bakes table.'
+      );
+      console.error(err);
+    }
   };
 
-  // Toggle featured flag
+  // Toggle featured flag (direct + realtime)
   const toggleFeatured = async (bake: Bake) => {
-    const updated = bakes.map((b) =>
-      b.id === bake.id ? { ...b, featured: !b.featured } : b
-    );
+    try {
+      const supabase = getSupabase();
+      const { error } = await supabase
+        .from(BAKES_TABLE)
+        .update({ featured: !bake.featured })
+        .eq('id', bake.id);
 
-    await persistBakes(updated);
-    // Toast is shown after refetch in persistBakes success path is not needed here
-    // because we don't want two toasts. The action is obvious.
+      if (error) throw error;
+      // Star visual + realtime is enough feedback
+    } catch (err) {
+      toast.error(
+        'Failed to toggle featured. Check Supabase connection (Vercel env vars + table policies).'
+      );
+      console.error(err);
+    }
   };
 
-  // Reorder using full re-sequence of display_order (very reliable)
+  /**
+   * Reorder using a full re-sequence of display_order.
+   * This is the most reliable way to handle ordering without race conditions.
+   */
   const moveBake = async (id: string, direction: 'up' | 'down') => {
     const currentIndex = bakes.findIndex((b) => b.id === id);
     if (currentIndex === -1) return;
@@ -353,24 +377,64 @@ export default function App() {
     const newOrder = [...bakes];
     [newOrder[currentIndex], newOrder[targetIndex]] = [newOrder[targetIndex], newOrder[currentIndex]];
 
-    // Re-assign clean sequential order
-    const reordered = newOrder.map((bake, index) => ({
-      ...bake,
+    // Re-assign sequential display_order values 0..n
+    const updates = newOrder.map((bake, index) => ({
+      id: bake.id,
       display_order: index,
     }));
 
-    await persistBakes(reordered);
+    try {
+      const supabase = getSupabase();
+
+      // Update all affected rows. Realtime will reflect the new order.
+      await Promise.all(
+        updates.map((u) =>
+          supabase
+            .from(BAKES_TABLE)
+            .update({ display_order: u.display_order })
+            .eq('id', u.id)
+        )
+      );
+    } catch (err) {
+      toast.error(
+        'Failed to reorder. This usually means a Supabase connection or RLS policy issue. ' +
+        'Check VITE_SUPABASE_* vars in Vercel and table policies.'
+      );
+      console.error(err);
+      refetch().catch(() => {});
+    }
   };
 
-  // Delete: remove from list + tell server to delete the actual image blob
+  /**
+   * Delete a bake: remove the DB row + the storage object.
+   * Realtime will remove it from the list.
+   */
   const deleteBake = async (bake: Bake) => {
     if (!confirm(`Delete "${bake.title}"? This cannot be undone.`)) return;
 
-    const updated = bakes.filter((b) => b.id !== bake.id);
-    const ok = await persistBakes(updated, [bake.pathname]);
+    try {
+      const supabase = getSupabase();
 
-    if (ok) {
+      const { error: dbError } = await supabase
+        .from(BAKES_TABLE)
+        .delete()
+        .eq('id', bake.id);
+
+      if (dbError) throw dbError;
+
+      if (bake.storage_path) {
+        await supabase.storage
+          .from(BAKES_BUCKET)
+          .remove([bake.storage_path])
+          .catch(() => {});
+      }
+
       toast.success('Photo deleted');
+    } catch (err: any) {
+      toast.error(
+        'Failed to delete. Check Supabase URL/anon key in Vercel env vars and that storage + table policies allow deletes.'
+      );
+      console.error(err);
     }
   };
 
@@ -750,8 +814,8 @@ export default function App() {
                     </div>
 
                     <div 
-                      className={`dropzone mb-4 ${uploadPreview ? 'border-[#C17F59]' : ''}`}
-                      onClick={() => fileInputRef.current?.click()}
+                      className={`dropzone mb-4 ${uploadPreview ? 'border-[#C17F59]' : ''} ${isUploading ? 'opacity-75 pointer-events-none' : ''}`}
+                      onClick={() => !isUploading && fileInputRef.current?.click()}
                       onDrop={handleDrop}
                       onDragOver={handleDragOver}
                     >
@@ -763,7 +827,19 @@ export default function App() {
                         onChange={(e) => handleFileSelect(e.target.files?.[0] || null)}
                       />
                       
-                      {uploadPreview ? (
+                      {isUploading ? (
+                        <div className="flex flex-col items-center py-4">
+                          <div className="text-[#C17F59] font-medium mb-2">Uploading to Supabase… {uploadProgress}%</div>
+                          {/* Simple accessible progress bar */}
+                          <div className="w-4/5 h-2.5 bg-[#E5D9C7] rounded-full overflow-hidden">
+                            <div 
+                              className="h-full bg-[#C17F59] transition-all duration-200" 
+                              style={{ width: `${uploadProgress}%` }} 
+                            />
+                          </div>
+                          <div className="text-xs text-[#8B6F5C] mt-2">Please keep this tab open</div>
+                        </div>
+                      ) : uploadPreview ? (
                         <div className="flex flex-col items-center">
                           <img src={uploadPreview} alt="preview" className="max-h-64 rounded-xl mb-3 shadow" />
                           <div className="text-sm text-[#C17F59]">Tap to choose a different photo</div>
@@ -772,7 +848,9 @@ export default function App() {
                         <>
                           <Camera className="mx-auto mb-3 text-[#C17F59]" size={32} />
                           <div className="font-medium">Tap or drop a photo here</div>
-                          <div className="text-sm text-[#8B6F5C] mt-1">Works great from your phone camera roll or camera</div>
+                          <div className="text-sm text-[#8B6F5C] mt-1">
+                            On phone: opens camera or photo library (large tap target)
+                          </div>
                         </>
                       )}
                     </div>
@@ -822,16 +900,24 @@ export default function App() {
                     <button 
                       onClick={uploadBake} 
                       disabled={isUploading || !uploadFile || !uploadTitle.trim()}
-                      className="btn btn-primary btn-lg w-full mt-5 flex items-center justify-center gap-2 disabled:opacity-70"
+                      className="btn btn-primary btn-lg w-full mt-5 flex items-center justify-center gap-2 disabled:opacity-70 min-h-[52px] text-base"
                     >
                       {isUploading ? (
-                        <>Uploading... {uploadProgress > 0 && `${uploadProgress}%`}</>
+                        <>Uploading to Supabase… {uploadProgress}%</>
                       ) : (
                         <>Publish to Gallery</>
                       )}
                     </button>
-                    {uploadFile && (
-                      <button onClick={resetUploadForm} className="text-xs text-[#8B6F5C] mx-auto block mt-3 underline">
+
+                    <div className="text-[11px] text-center text-[#8B6F5C] mt-2">
+                      Works best on mobile data or good Wi-Fi. Large button for easy thumb tap.
+                    </div>
+
+                    {uploadFile && !isUploading && (
+                      <button 
+                        onClick={resetUploadForm} 
+                        className="text-xs text-[#8B6F5C] mx-auto block mt-2 underline active:text-[#C17F59]"
+                      >
                         Clear selection
                       </button>
                     )}
@@ -916,7 +1002,7 @@ export default function App() {
                     )}
 
                     <div className="text-[10px] text-[#8B6F5C] mt-3 px-1">
-                      Tip: Tap the title to rename. Use the arrows to reorder. Changes save to Vercel Blob instantly.
+                      Tip: Tap the title to rename. Use the arrows to reorder. Changes save instantly to Supabase (realtime updates the gallery too).
                     </div>
                   </div>
                 </div>
