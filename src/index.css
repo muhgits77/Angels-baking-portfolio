@@ -477,41 +477,8 @@ textarea.input { min-height: 120px; resize: vertical; line-height: 1.6; }
 
 /* ============================================
    PREMIUM LIGHTBOX — the star of the show
+   (See consolidated responsive rules near end of file for mobile fixes, arrows, safe-area, stacking)
    ============================================ */
-.lightbox {
-  position: fixed; inset: 0; z-index: 200; background: rgba(18,15,12,0.96);
-  display: flex; align-items: center; justify-content: center; padding: 1rem;
-}
-.lightbox-content {
-  position: relative; max-width: 1080px; width: 100%; max-height: 94vh;
-  display: flex; flex-direction: column;
-}
-.lightbox-img-wrap {
-  position: relative; background: #111; border-radius: 14px; overflow: hidden;
-  box-shadow: 0 40px 90px -15px rgb(0 0 0 / 0.6);
-}
-.lightbox-img-wrap img {
-  max-width: 100%; max-height: 82vh; width: auto; height: auto; margin: 0 auto; display: block;
-  object-fit: contain; border-radius: 14px;
-}
-.lightbox-meta {
-  margin-top: 1rem; display: flex; justify-content: space-between; align-items: flex-end; gap: 1rem;
-  color: #EDE3D4; padding: 0 0.5rem;
-}
-.lightbox-meta .left .title { font-family: var(--font-serif); font-size: 1.55rem; font-weight: 700; }
-.lightbox-meta .left .category { font-size: 0.8rem; letter-spacing: 2px; text-transform: uppercase; color: var(--gold); }
-.lightbox-meta .desc { max-width: 620px; margin-top: 0.4rem; font-size: 0.97rem; color: #C9B39E; line-height: 1.5; }
-
-.lightbox-close, .lightbox-nav {
-  position: absolute; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2);
-  color: white; border-radius: 999px; width: 48px; height: 48px; display: flex; align-items: center; justify-content: center;
-  backdrop-filter: blur(8px); transition: all .15s ease;
-}
-.lightbox-close { top: 16px; right: 16px; }
-.lightbox-close:hover { background: var(--accent); border-color: var(--accent); }
-.lightbox-nav { top: 50%; transform: translateY(-50%); }
-.lightbox-nav.prev { left: 12px; } .lightbox-nav.next { right: 12px; }
-.lightbox-nav:hover { background: var(--accent); }
 
 /* ============================================
    TESTIMONIALS — warm & believable
@@ -1044,25 +1011,7 @@ h3 { font-size: 1.5rem; line-height: 1.15; }
   transform: scale(0.96);
 }
 
-/* Lightbox */
-.lightbox {
-  position: fixed;
-  inset: 0;
-  background: rgba(0,0,0,0.92);
-  z-index: 200;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 1rem;
-}
-
-.lightbox img {
-  max-width: 100%;
-  max-height: 88vh;
-  object-fit: contain;
-  border-radius: 8px;
-  box-shadow: 0 25px 60px -10px rgb(0 0 0 / 0.6);
-}
+/* (Old lightbox styles removed — consolidated mobile-first rules live near bottom of stylesheet) */
 
 /* Form inputs */
 .input {
@@ -1417,7 +1366,12 @@ h3 { font-size: 1.5rem; line-height: 1.15; }
   margin-top: 1px;
 }
 
-/* Premium lightbox — gallery star */
+/* ============================================
+   PREMIUM LIGHTBOX / DETAIL MODAL + CAROUSEL
+   Warm dark theater for food photos. Arrows strictly inside image area.
+   Mobile: no arrow overlap with titles/desc, no tall text tower, generous
+   safe-area, large 48px+ touch targets, premium readable typography.
+   ============================================ */
 .lightbox {
   position: fixed; 
   inset: 0; 
@@ -1426,37 +1380,200 @@ h3 { font-size: 1.5rem; line-height: 1.15; }
   display: flex; 
   align-items: center; 
   justify-content: center; 
-  padding: 1rem;
+  /* Proper safe-area for iPhone notch, Dynamic Island, Android gestures */
+  padding-top: env(safe-area-inset-top, 0.6rem);
+  padding-right: env(safe-area-inset-right, 0.6rem);
+  padding-bottom: env(safe-area-inset-bottom, 0.6rem);
+  padding-left: env(safe-area-inset-left, 0.6rem);
+}
+.lightbox-content {
+  position: relative;
+  max-width: 1080px;
+  width: 100%;
+  max-height: calc(100dvh - 0.75rem);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  margin: 0 auto;
 }
 .lightbox-img-wrap {
   position: relative;
   background: #111;
-  border-radius: 16px;
+  border-radius: 14px;
   overflow: hidden;
   box-shadow: 0 40px 90px -15px rgb(0 0 0 / 0.6), 
               0 0 0 1px rgba(255,255,255,0.06) inset;
+  flex-shrink: 0;
+}
+.lightbox-img-wrap img {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 64vh;
+  object-fit: contain;
+  margin: 0 auto;
 }
 .lightbox-meta {
-  margin-top: 1.1rem; 
+  margin-top: 0.7rem; 
   display: flex; 
   justify-content: space-between; 
   align-items: flex-end; 
   gap: 1rem;
   color: #EDE3D4; 
-  padding: 0 0.4rem;
+  padding: 0.1rem 0.35rem 0.15rem;
+  flex-shrink: 0;
+  border-top: 1px solid rgba(201,179,158,0.18);
 }
-.lightbox-meta .title { 
+.lightbox-meta .left .title { 
   font-family: var(--font-serif); 
-  font-size: 1.6rem; 
+  font-size: 1.38rem; 
   font-weight: 700; 
-  letter-spacing: -0.4px;
+  letter-spacing: -0.28px;
+  line-height: 1.18;
+}
+.lightbox-meta .left .category { 
+  font-size: 0.72rem; 
+  letter-spacing: 1.85px; 
+  text-transform: uppercase; 
+  color: var(--gold); 
+  margin-top: 1px;
 }
 .lightbox-meta .desc {
   max-width: 620px; 
-  margin-top: 0.35rem; 
-  font-size: 0.98rem; 
+  margin-top: 0.28rem; 
+  font-size: 0.94rem; 
   color: #C9B39E; 
-  line-height: 1.5;
+  line-height: 1.58;
+}
+
+/* Desktop arrow + close (positioned inside the relative .lightbox-content but
+   appear inside .lightbox-img-wrap because they are DOM children of it) */
+.lightbox-close, .lightbox-nav {
+  position: absolute; 
+  background: rgba(255,255,255,0.12); 
+  border: 1px solid rgba(255,255,255,0.22);
+  color: white; 
+  border-radius: 999px; 
+  width: 48px; 
+  height: 48px; 
+  display: flex; 
+  align-items: center; 
+  justify-content: center;
+  backdrop-filter: blur(10px); 
+  transition: all .15s ease;
+  z-index: 20;
+  min-width: 48px;
+  min-height: 48px;
+}
+.lightbox-close { top: 14px; right: 14px; }
+.lightbox-close:hover { background: var(--accent); border-color: var(--accent); }
+.lightbox-nav { top: 50%; transform: translateY(-50%); }
+.lightbox-nav.prev { left: 14px; } 
+.lightbox-nav.next { right: 14px; }
+.lightbox-nav:hover { background: var(--accent); border-color: var(--accent); }
+
+/* ===== MOBILE DETAIL VIEW FIXES (640px and below) =====
+   - Arrows never overlap title/desc (higher placement + bottom photo fade in JSX)
+   - No "tower of text": tighter responsive sizes, excellent line-heights, controlled gaps/padding
+   - Safe-area respected on all 4 edges + extra bottom padding
+   - Large reliable touch targets (48px min)
+   - Smooth scrolling for long descriptions (content becomes scrollable)
+   - Premium readable measure even when stacked
+*/
+@media (max-width: 640px) {
+  .lightbox {
+    align-items: flex-start;
+    padding-top: env(safe-area-inset-top, 0.5rem);
+    padding-right: env(safe-area-inset-right, 0.4rem);
+    padding-bottom: env(safe-area-inset-bottom, 0.5rem);
+    padding-left: env(safe-area-inset-left, 0.4rem);
+  }
+  .lightbox-content {
+    max-height: 100dvh;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+    border-radius: 0;
+  }
+  .lightbox-img-wrap {
+    border-radius: 12px;
+  }
+  .lightbox-img-wrap img {
+    /* Leave generous room for meta so text never feels cramped or cut off */
+    max-height: 54vh;
+  }
+  .lightbox-meta {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.5rem;
+    margin-top: 0.55rem;
+    padding: 0.55rem 0.5rem calc(0.55rem + env(safe-area-inset-bottom, 0));
+    border-top-color: rgba(201,179,158,0.22);
+  }
+  .lightbox-meta .left .title {
+    font-size: clamp(1.06rem, 4.8vw, 1.22rem);
+    line-height: 1.22;
+    letter-spacing: -0.2px;
+  }
+  .lightbox-meta .left .category {
+    font-size: 0.65rem;
+    letter-spacing: 1.7px;
+  }
+  .lightbox-meta .desc {
+    max-width: 100%;
+    font-size: 0.875rem;
+    line-height: 1.48;
+    margin-top: 0.18rem;
+    /* Comfortable reading measure on phones */
+    max-width: min(100%, 38ch);
+  }
+  /* Target the actions container (added class in JSX) + fallback */
+  .lightbox-meta .lightbox-actions,
+  .lightbox-meta .flex.flex-col {
+    align-items: stretch;
+    width: 100%;
+    gap: 0.35rem;
+  }
+  .lightbox-meta .btn {
+    width: 100%;
+    justify-content: center;
+    padding-top: 0.72rem;
+    padding-bottom: 0.72rem;
+    font-size: 0.95rem;
+    min-height: 48px;
+  }
+
+  /* Arrows higher on image (away from meta below) + larger guaranteed targets + safe-area */
+  .lightbox-nav {
+    top: 38%;
+    width: 48px;
+    height: 48px;
+    min-width: 48px;
+    min-height: 48px;
+  }
+  .lightbox-close {
+    width: 48px;
+    height: 48px;
+    min-width: 48px;
+    min-height: 48px;
+  }
+  .lightbox-nav.prev { left: max(10px, env(safe-area-inset-left, 10px)); }
+  .lightbox-nav.next { right: max(10px, env(safe-area-inset-right, 10px)); }
+  .lightbox-close { top: max(10px, env(safe-area-inset-top, 10px)); right: max(10px, env(safe-area-inset-right, 10px)); }
+}
+
+/* Extra small phones — still keep large targets and ultra-readable text */
+@media (max-width: 380px) {
+  .lightbox-nav, .lightbox-close {
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+    min-height: 44px;
+  }
+  .lightbox-nav svg, .lightbox-close svg { width: 20px; height: 20px; }
+  .lightbox-meta .left .title { font-size: 1.02rem; line-height: 1.2; }
+  .lightbox-meta .desc { font-size: 0.84rem; line-height: 1.46; }
+  .lightbox-img-wrap img { max-height: 50vh; }
 }
 
 /* Elegant nav active states */
@@ -1539,3 +1656,79 @@ h3 { font-size: 1.5rem; line-height: 1.15; }
     transform: none !important;
   }
 }
+
+/* ============================================
+   MOBILE EXPERIENCE POLISH — safe areas, touch, readability, no tower text
+   Prioritizes detail modal + general text on phones (Android/iOS)
+   ============================================ */
+@media (max-width: 640px) {
+  /* Global: safer line lengths, breathing, prevent tall text stacks */
+  body {
+    font-size: 0.96rem;
+    line-height: 1.68;
+  }
+  h1 { font-size: 2.1rem; line-height: 1.1; }
+  h2 { font-size: 1.65rem; line-height: 1.15; }
+  h3 { font-size: 1.28rem; line-height: 1.2; }
+
+  .lead { font-size: 1.02rem; line-height: 1.6; }
+  .story-prose, .story-container {
+    font-size: 0.97rem;
+    line-height: 1.72;
+    max-width: 100%;
+  }
+  .story-prose h3 { font-size: 1.22rem; margin-top: 2.1rem; }
+  .story-pullquote {
+    font-size: 1.18rem;
+    line-height: 1.35;
+    padding-left: 1.1rem;
+    margin: 2rem 0;
+  }
+
+  /* Cards & overlays: better readable text, less crowding */
+  .bake-hero-card .meta { padding: 1rem 1rem 1.15rem; }
+  .bake-hero-card .meta h3 { font-size: 1.18rem; }
+  .bake-hero-card .desc { font-size: 0.9rem; line-height: 1.5; }
+  .bake-card .overlay { padding: 1.05rem 0.95rem 0.75rem; }
+  .bake-card .title { font-size: 1.0rem; line-height: 1.2; }
+
+  /* Signature grid tighter but breathable */
+  .signature-grid { gap: 1.1rem; }
+
+  /* Masonry */
+  .masonry { column-gap: 0.9rem; }
+  .masonry-item { margin-bottom: 0.95rem; }
+
+  /* Modals general safe-area + padding */
+  .studio-modal { padding: env(safe-area-inset-top, 0.5rem) env(safe-area-inset-right, 0.5rem) env(safe-area-inset-bottom, 0.5rem) env(safe-area-inset-left, 0.5rem); }
+  .studio-panel { max-height: 100dvh; border-radius: 16px 16px 0 0; margin-top: auto; }
+
+  /* Inquiry / contact forms */
+  .inquiry-form .row { gap: 0.75rem; }
+  .contact-card { padding: 1.75rem 1.25rem; }
+
+  /* Nav mobile polish + safe area */
+  .nav-inner { padding-top: calc(0.6rem + env(safe-area-inset-top, 0)); padding-bottom: 0.55rem; }
+  .nav-links a { padding-bottom: 3px; }
+
+  /* Larger tap targets everywhere practical */
+  .chip { padding: 0.55rem 0.95rem; min-height: 40px; }
+  .btn { min-height: 44px; }
+  .btn-ghost { min-height: 40px; padding: 0.4rem 0.75rem; }
+}
+
+/* Extra safe-area + dvh for hero and full-bleed on modern phones */
+@supports (height: 100dvh) {
+  .hero { min-height: 100dvh; }
+  .lightbox-content { max-height: 100dvh; }
+}
+
+/* Android / low-end touch smoothness helpers + premium lightbox */
+.lightbox-img-wrap,
+.bake-card,
+.bake-hero-card {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+/* (lightbox mobile rules consolidated above for clarity and to avoid override conflicts) */
