@@ -38,25 +38,25 @@ export function Gallery({ onOpenLightbox, onOpenStudio }: GalleryProps) {
             <div className="uppercase tracking-[3px] text-xs text-[#C17F59]">Every batch tells a story</div>
             <h1>The Gallery</h1>
           </div>
-          <button onClick={onOpenStudio} className="btn btn-primary self-start sm:self-auto flex items-center gap-2">
-            <Camera size={17} /> Add New Photo
-          </button>
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 self-start sm:self-auto w-full sm:w-auto">
+            <input
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Search bakes..."
+              className="input max-w-[260px] text-sm py-2 w-full sm:w-auto"
+            />
+            <button onClick={onOpenStudio} className="btn btn-primary flex items-center gap-2 shrink-0">
+              <Camera size={17} /> Add New Photo
+            </button>
+          </div>
         </div>
 
-        <div className="flex flex-col sm:flex-row gap-3 mb-5">
-          <div className="flex gap-2 overflow-x-auto pb-2 -mx-1 px-1 flex-1">
-            {(['all', ...CATEGORIES] as const).map(cat => (
-              <button key={cat} onClick={() => setFilter(cat as any)} className={`chip ${filter === cat ? 'chip-active' : ''}`}>
-                {CATEGORY_LABELS[cat]}
-              </button>
-            ))}
-          </div>
-          <input
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            placeholder="Search bakes..."
-            className="input max-w-[260px] text-sm py-2"
-          />
+        <div className="flex gap-2 overflow-x-auto pb-2 -mx-1 px-1 mb-5">
+          {(['all', ...CATEGORIES] as const).map(cat => (
+            <button key={cat} onClick={() => setFilter(cat as any)} className={`chip ${filter === cat ? 'chip-active' : ''}`}>
+              {CATEGORY_LABELS[cat]}
+            </button>
+          ))}
         </div>
 
         {error && (

@@ -76,6 +76,12 @@ export const CATEGORIES = [
   'bagels',
   'pastries',
   'cookies',
+  'muffins',
+  'pies',
+  'dips',
+  'jams',
+  'compotes',
+  'gifts',
 ] as const;
 
 export type Category = (typeof CATEGORIES)[number];
@@ -88,6 +94,12 @@ export const CATEGORY_LABELS: Record<Category | 'all', string> = {
   bagels: 'Bagels',
   pastries: 'Pastries',
   cookies: 'Cookies',
+  muffins: 'Muffins',
+  pies: 'Pies',
+  dips: 'Dips',
+  jams: 'Jams',
+  compotes: 'Compotes',
+  gifts: 'Gifts',
 };
 
 // Read env vars once at module load (for early logging)
